@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ParkEase - Smart parking booking platform. Find, book and pay for parking spots instantly.">
+  <title>ParkEase - Smart Parking Solutions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/notifications.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/animations.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a5c8e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='9' rx='1'/%3E%3Crect x='14' y='3' width='7' height='5' rx='1'/%3E%3Crect x='14' y='12' width='7' height='9' rx='1'/%3E%3Crect x='3' y='16' width='7' height='5' rx='1'/%3E%3C/svg%3E">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- ======================= Navbar ======================= -->
+  <nav class="navbar" aria-label="Main navigation">
+    <div class="container navbar-inner">
+      <a href="#" data-nav="home" class="navbar-brand" data-view-link="home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        </span>
+        ParkEase
+      </a>
+
+      <button class="navbar-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <div class="navbar-menu" id="navbar-menu">
+        <div class="navbar-links">
+          <a href="#" class="nav-link" data-view-link="home">Home</a>
+          <a href="#" class="nav-link" data-view-link="facilities">Find Parking</a>
+          <a href="#" class="nav-link d-none" data-nav-auth data-view-link="dashboard">My Dashboard</a>
+          <a href="#" class="nav-link d-none" data-nav-admin data-view-link="admin">Admin</a>
+        </div>
+        <div class="navbar-auth">
+          <div class="navbar-user d-none" data-nav-user>
+            <div class="notif" data-notif>
+              <button class="icon-btn touch-target notif-btn" data-notif-toggle aria-label="Notifications" aria-expanded="false" aria-haspopup="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span class="notif-badge d-none" data-notif-count>0</span>
+              </button>
+              <div class="notif-panel" data-notif-panel role="dialog" aria-label="Notifications">
+                <div class="notif-head">
+                  <strong>Notifications</strong>
+                  <button class="btn btn-sm btn-outline" data-notif-mark-all>Mark all read</button>
+                  <button class="btn btn-sm btn-ghost" data-notif-clear>Clear</button>
+                </div>
+                <div class="notif-list" data-notif-list></div>
+              </div>
+            </div>
+            <span class="user-avatar" data-user-avatar aria-hidden="true">P</span>
+            <span class="d-none d-md-inline text-muted" data-user-name style="font-size:0.875rem"></span>
+            <button class="icon-btn touch-target" data-nav-logout aria-label="Log out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+          </div>
+          <div data-nav-guest>
+            <button class="btn btn-outline btn-sm" data-view-link="login" style="margin-right:8px">Sign In</button>
+            <button class="btn btn-primary btn-sm" data-view-link="register">Get Started</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ======================= VIEW: HOME ======================= -->
+    <section id="view-home" class="view active" aria-label="Home">
+      <div class="hero">
+        <div class="container">
+          <div class="hero-grid">
+            <div class="hero-content">
+              <span class="hero-badge animate-fade-in-up">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                10 cities &middot; 20 facilities &middot; 3200+ slots
+              </span>
+              <h1 class="animate-fade-in-up delay-1">Never hunt for <span class="highlight">parking</span> again</h1>
+              <p class="animate-fade-in-up delay-2">Find a spot, book it instantly and pay securely with ParkEase. Real-time availability across the smartest parking network in India.</p>
+              <div class="hero-cta animate-fade-in-up delay-3">
+                <button class="btn btn-primary btn-lg" data-view-link="facilities">Find Parking Now</button>
+                <button class="btn btn-secondary btn-lg" data-view-link="register">Create Account</button>
+              </div>
+            </div>
+            <div class="hero-visual animate-fade-in-up delay-2" aria-hidden="true">
+              <div class="hero-card">
+                <div class="hero-card-title">Live availability &mdash; ParkEase Tech Park</div>
+                <div class="hero-availability">
+                  <span style="display:flex;align-items:center;gap:10px;font-weight:600">
+                    <span class="availability-dot"></span>
+                    <span style="font-size:0.9375rem">Open now &middot; 128 free slots</span>
+                  </span>
+                  <span class="badge badge-success">
+                    <span class="badge-dot"></span>85% full
+                  </span>
+                </div>
+                <div class="slot-grid" id="hero-slot-grid" style="grid-template-columns: repeat(6, 1fr)">
+                </div>
+                <div class="hero-stats">
+                  <div class="hero-stat">
+                    <div class="hero-stat-value" id="hero-stat-cities">10</div>
+                    <div class="hero-stat-label">Cities</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hero-stat-value" id="hero-stat-facilities">20</div>
+                    <div class="hero-stat-label">Facilities</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hero-stat-value" id="hero-stat-slots">3200+</div>
+                    <div class="hero-stat-label">Smart slots</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="search-box">
+          <input type="text" id="home-search" class="form-input" placeholder="Search by city, area or facility name..." aria-label="Search parking">
+          <button class="btn btn-primary" data-home-search>Search</button>
+          <button class="btn btn-secondary" data-home-search-class="btn" data-view-link="facilities" style="display:none"></button>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="section">
+        <div class="container">
+          <div class="section-header center">
+            <div class="section-eyebrow">Why ParkEase</div>
+            <h2 class="section-title">Parking made effortless</h2>
+            <p class="section-subtitle">Everything you need for stress-free parking &mdash; from finding a slot to getting your receipt.</p>
+          </div>
+          <div class="grid-3">
+            <div class="card feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <h3>Real-time availability</h3>
+              <p>Live slot counts across all facilities. See exactly what&apos;s free before you arrive &mdash; no more wasting time circling the block.</p>
+            </div>
+            <div class="card feature-card">
+              <div class="feature-icon accent">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+              </div>
+              <h3>Instant booking</h3>
+              <p>Reserve your slot in seconds with smart pricing, auto-applied discounts and instant confirmation with a scannable QR code.</p>
+            </div>
+            <div class="card feature-card">
+              <div class="feature-icon secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M4 17h16"/></svg>
+              </div>
+              <h3>Secure payments</h3>
+              <p>Pay by card, UPI, wallet or netbanking. Digital receipts, GST invoicing and a wallet with instant refunds on cancellation.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="section" style="background:var(--color-bg-card);border-top:1px solid var(--color-border-light);border-bottom:1px solid var(--color-border-light)">
+        <div class="container">
+          <div class="section-header center">
+            <div class="section-eyebrow">Simple Process</div>
+            <h2 class="section-title">How it works</h2>
+          </div>
+          <div class="steps">
+            <div class="step">
+              <div class="step-number">1</div>
+              <h3>Find a facility</h3>
+              <p>Search by city or use the map to find nearby parking with live availability.</p>
+            </div>
+            <div class="step">
+              <div class="step-number">2</div>
+              <h3>Pick your slot</h3>
+              <p>Choose your vehicle, time and slot. See the price instantly with discounts.</p>
+            </div>
+            <div class="step">
+              <div class="step-number">3</div>
+              <h3>Pay &amp; park</h3>
+              <p>Pay securely, show your QR at the gate, and park stress-free. Cashless &amp; simple.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cities -->
+      <div class="section">
+        <div class="container">
+          <div class="section-header center">
+            <div class="section-eyebrow">Coverage</div>
+            <h2 class="section-title">Available in your city</h2>
+            <p class="section-subtitle">Choose a city to explore parking facilities near you.</p>
+          </div>
+          <div class="city-chips" id="city-chips">
+            <span class="loading" aria-label="Loading"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: FACILITIES ======================= -->
+    <section id="view-facilities" class="view" aria-label="Find parking">
+      <div class="container" style="padding-top:var(--spacing-xl)">
+        <div class="page-title">
+          <h1>Find Parking</h1>
+          <p>Browse facilities and book your slot in minutes.</p>
+        </div>
+
+        <div class="filter-bar" role="search">
+          <div class="form-group">
+            <label class="form-label" for="fac-city">City</label>
+            <select id="fac-city" class="form-input form-select">
+              <option value="">All cities</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fac-type">Vehicle type</label>
+            <select id="fac-type" class="form-input form-select">
+              <option value="">All vehicles</option>
+              <option value="Car">Car</option>
+              <option value="Bike">Bike</option>
+              <option value="Truck">Truck</option>
+              <option value="EV">EV</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fac-q">Search</label>
+            <input type="text" id="fac-q" class="form-input" placeholder="Name, area, facility...">
+          </div>
+          <button class="btn btn-primary" data-facilities-apply>Apply Filters</button>
+        </div>
+
+        <div id="facilities-grid" class="grid-3" aria-live="polite"></div>
+        <div id="facilities-empty" class="empty-state d-none">
+          <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </div>
+          <h3>No facilities found</h3>
+          <p>Try adjusting your filters or searching in a different city.</p>
+          <button class="btn btn-secondary" data-facilities-reset>Clear filters</button>
+        </div>
+
+        <nav class="pagination" id="facilities-pagination" aria-label="Facilities pages"></nav>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: FACILITY DETAIL ======================= -->
+    <section id="view-facility" class="view" aria-label="Facility detail">
+      <div class="container" style="padding-top:var(--spacing-xl)">
+        <button class="btn btn-secondary mb-3" data-view-link="facilities">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to facilities
+        </button>
+
+        <div id="facility-detail-header"></div>
+
+        <div class="grid-2" style="grid-template-columns: 1.3fr 0.7fr; align-items: start">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">Select your slot</h3>
+              <span class="badge badge-info" id="slot-selected-count-badge">0 selected</span>
+            </div>
+            <div class="card-body">
+              <div class="form-row mb-3">
+                <div class="form-group">
+                  <label class="form-label" for="booking-vehicle-type">Vehicle type</label>
+                  <select id="booking-vehicle-type" class="form-input form-select">
+                    <option value="Car">Car</option>
+                    <option value="Bike">Bike</option>
+                    <option value="Truck">Truck</option>
+                    <option value="EV">EV</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="booking-slot-count">Number of slots</label>
+                  <select id="booking-slot-count" class="form-input form-select">
+                    <option value="1">1 slot</option>
+                    <option value="2">2 slots</option>
+                    <option value="3">3 slots</option>
+                    <option value="4">4 slots</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row mb-3">
+                <div class="form-group">
+                  <label class="form-label" for="booking-date">Start date</label>
+                  <input type="date" id="booking-date" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="booking-start">Start time</label>
+                  <input type="time" id="booking-start" class="form-input" value="10:00">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="booking-end">End time</label>
+                  <input type="time" id="booking-end" class="form-input" value="12:00">
+                </div>
+              </div>
+              <div id="slot-grid-container"></div>
+            </div>
+          </div>
+
+          <div class="card booking-summary">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">Booking summary</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label" for="booking-vehicles-list">Vehicle numbers</label>
+                <p class="text-muted" style="font-size:0.8125rem" id="booking-vehicle-hint">
+                  One vehicle number per selected slot. Select your slots on the left and enter each vehicle below.
+                </p>
+                <div id="booking-vehicles-list"></div>
+              </div>
+              <div id="rental-summary" class="mb-3">
+                <div class="summary-item"><span class="label">Facility</span><span class="value" id="sum-facility">-</span></div>
+                <div class="summary-item"><span class="label">Duration</span><span class="value" id="sum-duration">-</span></div>
+                <div class="summary-item"><span class="label">Base price</span><span class="value" id="sum-base">&ndash;</span></div>
+                <div class="summary-item discount"><span class="label" id="sum-discount-label">Discount</span><span class="value" id="sum-discount">&ndash;</span></div>
+                <div class="summary-item"><span class="label">GST (18%)</span><span class="value" id="sum-gst">&ndash;</span></div>
+                <div class="summary-item total"><span class="label">Total</span><span class="value" id="sum-total">&ndash;</span></div>
+              </div>
+              <button class="btn btn-primary btn-lg btn-full" data-start-booking disabled>Proceed to Book</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: LOGIN ======================= -->
+    <section id="view-login" class="view" aria-label="Sign in">
+      <div class="auth-page">
+        <div class="auth-card">
+          <div class="auth-card-header">
+            <span class="brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            </span>
+            <h2>Welcome back</h2>
+            <p>Sign in to manage your parking.</p>
+          </div>
+          <form id="login-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="login-email">Email address</label>
+              <input type="email" id="login-email" class="form-input" placeholder="you@example.com" autocomplete="email" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="login-password">Password</label>
+              <input type="password" id="login-password" class="form-input" placeholder="Your password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-full mt-4">Sign In</button>
+          </form>
+          <div class="auth-switch">
+            Don&apos;t have an account? <a href="#" data-view-link="register">Create one</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: REGISTER ======================= -->
+    <section id="view-register" class="view" aria-label="Create account">
+      <div class="auth-page">
+        <div class="auth-card">
+          <div class="auth-card-header">
+            <span class="brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            </span>
+            <h2>Create your account</h2>
+            <p>Start booking parking in minutes.</p>
+          </div>
+          <form id="register-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="reg-name">Full name</label>
+              <input type="text" id="reg-name" class="form-input" placeholder="e.g. Rahul Sharma" autocomplete="name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-email">Email address</label>
+              <input type="email" id="reg-email" class="form-input" placeholder="you@example.com" autocomplete="email" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-phone">Mobile number</label>
+              <input type="tel" id="reg-phone" class="form-input" placeholder="10-digit mobile number" autocomplete="tel" maxlength="10" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-password">Password</label>
+              <input type="password" id="reg-password" class="form-input" placeholder="Min 8 chars, 1 uppercase, 1 number &amp; symbol" autocomplete="new-password" required>
+              <span class="password-hint">Minimum 8 characters with an uppercase letter, number and special character.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-vehicle">Vehicle number <span class="text-muted">(optional)</span></label>
+              <input type="text" id="reg-vehicle" class="form-input" placeholder="e.g. MH12AB1234" maxlength="15">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-full mt-4">Create Account</button>
+          </form>
+          <div class="auth-switch">
+            Already have an account? <a href="#" data-view-link="login">Sign in</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: USER DASHBOARD ======================= -->
+    <section id="view-dashboard" class="view" aria-label="User dashboard">
+      <div class="container" style="padding-top:var(--spacing-xl)">
+        <div class="page-title">
+          <h1>My Dashboard</h1>
+          <p id="dash-greeting">Welcome back!</p>
+        </div>
+
+        <div class="dashboard-layout">
+          <aside class="sidebar no-print">
+            <div class="dashboard-user">
+              <span class="user-avatar" data-user-avatar>P</span>
+              <div>
+                <div class="dashboard-user-name" data-user-name-full>User</div>
+                <div class="dashboard-user-email" data-user-email>user@example.com</div>
+              </div>
+            </div>
+            <nav class="sidebar-nav" aria-label="Dashboard sections">
+              <button class="sidebar-link active" data-dash-tab="bookings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                My Bookings
+              </button>
+              <button class="sidebar-link" data-dash-tab="vehicles">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><path d="M4 11h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                My Vehicles
+              </button>
+              <button class="sidebar-link" data-dash-tab="payments">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Payments
+              </button>
+              <button class="sidebar-link" data-dash-tab="profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Profile
+              </button>
+              <button class="sidebar-link d-none" data-dash-tab="admin" data-admin-sidebar>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                Admin Panel
+              </button>
+            </nav>
+          </aside>
+
+          <div class="dashboard-content">
+            <!-- Bookings tab -->
+            <div class="tab-panel active" data-dash-panel="bookings">
+              <div class="flex-between mb-3">
+                <h2 style="font-size:1.375rem">My Bookings</h2>
+                <button class="btn btn-outline btn-sm" data-view-link="facilities">+ New Booking</button>
+              </div>
+              <div id="dashboard-bookings"></div>
+            </div>
+
+            <!-- Vehicles tab -->
+            <div class="tab-panel" data-dash-panel="vehicles">
+              <div class="flex-between mb-3">
+                <h2 style="font-size:1.375rem">My Vehicles</h2>
+                <button class="btn btn-primary btn-sm" data-vehicle-add-btn>+ Add Vehicle</button>
+              </div>
+              <div id="dashboard-vehicles"></div>
+            </div>
+
+            <!-- Payments tab -->
+            <div class="tab-panel" data-dash-panel="payments">
+              <div class="flex-between mb-3">
+                <h2 style="font-size:1.375rem">Payments &amp; Wallet</h2>
+                <button class="btn btn-accent btn-sm" data-wallet-add-btn>+ Add Money</button>
+              </div>
+              <div id="dashboard-payments"></div>
+            </div>
+
+            <!-- Profile tab -->
+            <div class="tab-panel" data-dash-panel="profile">
+              <h2 style="font-size:1.375rem; margin-bottom:var(--spacing-lg)">Profile Settings</h2>
+              <div id="dashboard-profile"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= VIEW: ADMIN ======================= -->
+    <section id="view-admin" class="view" aria-label="Admin dashboard">
+      <div class="container" style="padding-top:var(--spacing-xl)">
+        <div class="page-title">
+          <h1>Admin Overview</h1>
+          <p>Monitor, manage and grow the ParkEase network.</p>
+        </div>
+
+        <div id="admin-stats" class="stats-grid"></div>
+
+        <div class="tabs mb-3" role="tablist" aria-label="Admin sections">
+          <button class="tab active" role="tab" data-admin-tab="verifications">Verifications <span class="tab-count d-none" data-verify-count>0</span></button>
+          <button class="tab" role="tab" data-admin-tab="bookings">Bookings</button>
+          <button class="tab" role="tab" data-admin-tab="users">Users</button>
+          <button class="tab" role="tab" data-admin-tab="facilities">Facilities</button>
+          <button class="tab" role="tab" data-admin-tab="revenue">Revenue</button>
+        </div>
+
+        <div class="tab-panel active" data-admin-panel="verifications">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">Payment screenshots awaiting review</h3>
+              <button class="btn btn-secondary btn-sm" data-verify-refresh>Refresh</button>
+            </div>
+            <div class="card-body" id="admin-verifications-body"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-admin-panel="bookings">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">All bookings</h3>
+              <div style="display:flex;gap:var(--spacing-sm)">
+                <select id="admin-booking-status" class="form-input form-select" style="min-width:150px">
+                  <option value="">All statuses</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body table-responsive" style="padding:0">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Booking</th><th>User</th><th>Facility</th><th>Vehicle</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="admin-bookings-body"></tbody>
+              </table>
+            </div>
+            <div class="card-footer" id="admin-bookings-footer" style="justify-content:center"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-admin-panel="users">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">Registered users</h3>
+              <input type="text" id="admin-user-search" class="form-input" placeholder="Search users..." style="min-width:220px">
+            </div>
+            <div class="card-body table-responsive" style="padding:0">
+              <table class="data-table">
+                <thead>
+                  <tr><th>User</th><th>User ID</th><th>Phone</th><th>Role</th><th>Wallet</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="admin-users-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-admin-panel="facilities">
+          <div class="card">
+            <div class="card-header flex-between">
+              <h3 style="font-size:1.0625rem">Facilities</h3>
+              <button class="btn btn-primary btn-sm" data-admin-facility-add>+ Add Facility</button>
+            </div>
+            <div class="card-body table-responsive" style="padding:0">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Facility</th><th>City</th><th>Capacity</th><th>Available</th><th>Rating</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="admin-facilities-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-admin-panel="revenue">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-size:1.0625rem">Revenue analytics (last 30 days)</h3>
+            </div>
+            <div class="card-body">
+              <div class="grid-3 mb-3" id="revenue-breakdown"></div>
+              <h4 class="mb-2">Daily revenue</h4>
+              <div id="revenue-chart" class="mb-4"></div>
+              <h4 class="mb-2">Top facilities</h4>
+              <div id="top-facilities"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================= Footer ======================= -->
+  <footer class="footer no-print">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            </span>
+            ParkEase
+          </div>
+          <p>India&apos;s smartest parking network. Book your spot in seconds with real-time availability, transparent pricing and secure payments.</p>
+        </div>
+        <div>
+          <h4>Explore</h4>
+          <div class="footer-links">
+            <a href="#" data-view-link="home">Home</a>
+            <a href="#" data-view-link="facilities">Find Parking</a>
+            <a href="#" data-view-link="login">Sign In</a>
+            <a href="#" data-view-link="register">Get Started</a>
+          </div>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <div class="footer-links">
+            <a href="#">Help Center</a>
+            <a href="#">Contact Us</a>
+            <a href="#">Cancellation Policy</a>
+            <a href="#">Terms of Service</a>
+          </div>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <div class="footer-links">
+            <a href="#">support@parkease.com</a>
+            <a href="#">+91-80-1234-5678</a>
+            <a href="#">123 Tech Park, Bengaluru</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">&copy; <span data-year>2026</span> ParkEase Technologies Pvt. Ltd. All rights reserved.</div>
+    </div>
+  </footer>
+
+  <!-- ======================= Booking Confirm Modal ======================= -->
+  <div class="modal-backdrop" id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="booking-modal-title">Review your booking</h3>
+        <button class="modal-close" data-modal-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="booking-modal-content"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" id="booking-confirm-btn">Confirm &amp; Proceed to Pay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= Payment Modal ======================= -->
+  <div class="modal-backdrop" id="payment-modal" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="payment-modal-title">Payment</h3>
+        <button class="modal-close" data-modal-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="payment-modal-content"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= Vehicle Add Modal ======================= -->
+  <div class="modal-backdrop" id="vehicle-modal" role="dialog" aria-modal="true" aria-labelledby="vehicle-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="vehicle-modal-title">Add a vehicle</h3>
+        <button class="modal-close" data-modal-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="vehicle-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="vehicle-no">Vehicle number</label>
+            <input type="text" id="vehicle-no" class="form-input" placeholder="e.g. MH12AB1234" maxlength="15" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vehicle-type">Vehicle type</label>
+            <select id="vehicle-type" class="form-input form-select">
+              <option value="Car">Car</option>
+              <option value="Bike">Bike</option>
+              <option value="Truck">Truck</option>
+              <option value="EV">EV</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-check" style="display:flex;align-items:center;gap:var(--spacing-sm);font-size:0.9375rem">
+              <input type="checkbox" id="vehicle-default" style="width:18px;height:18px"> Set as default vehicle
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" id="vehicle-save-btn">Save Vehicle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= Facility Add Modal ======================= -->
+  <div class="modal-backdrop" id="facility-modal" role="dialog" aria-modal="true" aria-labelledby="facility-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="facility-modal-title">Add facility</h3>
+        <button class="modal-close" data-modal-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="facility-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="fac-name">Facility name</label>
+              <input type="text" id="fac-name" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="fac-city">City</label>
+              <input type="text" id="fac-city-in" class="form-input" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="fac-street">Street</label>
+              <input type="text" id="fac-street" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="fac-area">Area</label>
+              <input type="text" id="fac-area" class="form-input" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="fac-pincode">Pincode</label>
+              <input type="text" id="fac-pincode" class="form-input" maxlength="6" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="fac-lat">Latitude</label>
+              <input type="number" id="fac-lat" class="form-input" step="any" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="fac-lng">Longitude</label>
+              <input type="number" id="fac-lng" class="form-input" step="any" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label" for="fac-total-car">Car slots</label><input type="number" id="fac-total-car" class="form-input" value="20" min="1"></div>
+            <div class="form-group"><label class="form-label" for="fac-total-bike">Bike slots</label><input type="number" id="fac-total-bike" class="form-input" value="30" min="1"></div>
+            <div class="form-group"><label class="form-label" for="fac-total-truck">Truck slots</label><input type="number" id="fac-total-truck" class="form-input" value="5" min="0"></div>
+            <div class="form-group"><label class="form-label" for="fac-total-ev">EV slots</label><input type="number" id="fac-total-ev" class="form-input" value="5" min="0"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" id="facility-save-btn">Create Facility</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= Success Modal ======================= -->
+  <div class="modal-backdrop" id="success-modal" role="dialog" aria-modal="true" aria-labelledby="success-modal-title">
+    <div class="modal">
+      <div class="modal-body" id="success-modal-body"></div>
+      <div class="modal-footer" id="success-modal-footer">
+        <button class="btn btn-primary" data-modal-close>Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

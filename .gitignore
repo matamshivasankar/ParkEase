@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Tooling / caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# SQLite database and runtime state
+instance/
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+
+# Generated at runtime by the app
+backend/uploads/
+backend/receipts/
+backend/qr_codes/
+backend/screenshots/
+
+# Local agent tooling
+.opencode/
+
+# Local editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
