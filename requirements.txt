@@ -1,0 +1,3 @@
+# Root requirements file - Render's Python runtime auto-installs this.
+# Actual pins live next to the backend code.
+-r backend/requirements.txt

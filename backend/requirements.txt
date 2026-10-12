@@ -13,3 +13,9 @@ gunicorn==22.0.0
 eventlet==0.33.3
 pytest==8.3.2
 pytest-cov==5.0.0
+
+# Production database driver (Render / Heroku PostgreSQL)
+psycopg2-binary==2.9.9
+
+# WebSocket transport for Flask-SocketIO in threading mode (Gunicorn gthread)
+simple-websocket==1.0.0

@@ -1,6 +1,43 @@
 import os
 from datetime import timedelta
 
+# Base directory for everything the app writes at runtime (uploads, receipts,
+# QR codes, screenshots). Override DATA_DIR to point these at a persistent
+# volume / Render Disk so they survive a redeploy.
+_DATA_DIR = os.environ.get('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))
+
+
+def _database_url():
+    """Return the SQLAlchemy connection string.
+
+    Render (like Heroku) injects ``DATABASE_URL`` using the legacy
+    ``postgres://`` scheme, which SQLAlchemy 2.x rejects. Normalise it to
+    ``postgresql://``; leave anything else untouched.
+    """
+    url = os.environ.get('DATABASE_URL', 'sqlite:///parkease.db')
+    if url.startswith('postgres://'):
+        url = 'postgresql://' + url[len('postgres://'):]
+    return url
+
+
+def _cors_origins():
+    """Comma-separated allowed origins.
+
+    When CORS_ORIGINS is not set explicitly, allow local development plus the
+    public URL Render assigns the service (RENDER_EXTERNAL_URL), so the bundled
+    frontend and the Socket.IO handshake work out of the box in production.
+    """
+    configured = os.environ.get('CORS_ORIGINS')
+    if configured:
+        return [origin.strip() for origin in configured.split(',') if origin.strip()]
+
+    origins = ['http://localhost:5000', 'http://127.0.0.1:5000']
+    render_url = os.environ.get('RENDER_EXTERNAL_URL')
+    if render_url:
+        origins.append(render_url.rstrip('/'))
+    return origins
+
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'parkease-secret-key-change-in-production')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'parkease-jwt-secret-change-in-production')
@@ -11,14 +48,14 @@ class Config:
     JWT_COOKIE_SECURE = False
     JWT_CSRF_IN_COOKIES = False
 
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///parkease.db')
+    SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
 
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000').split(',')
+    CORS_ORIGINS = _cors_origins()
 
-    RATELIMIT_DEFAULT = "200 per minute"
-    RATELIMIT_STORAGE_URL = "memory://"
+    RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '200 per minute')
+    RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL', 'memory://')
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
@@ -26,7 +63,7 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(_DATA_DIR, 'uploads'))
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
     BASE_RATES = {
@@ -62,11 +99,11 @@ class Config:
 
     SLOT_LOCK_DURATION = 10
 
-    RECEIPT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'receipts')
+    RECEIPT_FOLDER = os.environ.get('RECEIPT_FOLDER', os.path.join(_DATA_DIR, 'receipts'))
 
-    QR_CODE_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'qr_codes')
+    QR_CODE_FOLDER = os.environ.get('QR_CODE_FOLDER', os.path.join(_DATA_DIR, 'qr_codes'))
 
-    SCREENSHOT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'screenshots')
+    SCREENSHOT_FOLDER = os.environ.get('SCREENSHOT_FOLDER', os.path.join(_DATA_DIR, 'screenshots'))
 
 class DevelopmentConfig(Config):
     DEBUG = True
