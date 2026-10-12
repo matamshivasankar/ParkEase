@@ -19,7 +19,8 @@ def generate_qr_code(data):
     img = qr.make_image(fill_color="black", back_color="white")
 
     os.makedirs(Config.QR_CODE_FOLDER, exist_ok=True)
-    filename = f"qr_{data[:20].replace(':', '').replace('{', '').replace('}', '').replace('\"', '')}.png"
+    safe = data[:20].replace(':', '').replace('{', '').replace('}', '').replace('"', '')
+    filename = f"qr_{safe}.png"
     filepath = os.path.join(Config.QR_CODE_FOLDER, filename)
     img.save(filepath)
 
