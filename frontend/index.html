@@ -78,9 +78,9 @@
         <div class="container">
           <div class="hero-grid">
             <div class="hero-content">
-              <span class="hero-badge animate-fade-in-up">
+              <span class="hero-badge animate-fade-in-up" id="hero-stats-badge">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                10 cities &middot; 20 facilities &middot; 3200+ slots
+                <span id="hero-stat-cities-label">Loading...</span>
               </span>
               <h1 class="animate-fade-in-up delay-1">Never hunt for <span class="highlight">parking</span> again</h1>
               <p class="animate-fade-in-up delay-2">Find a spot, book it instantly and pay securely with ParkEase. Real-time availability across the smartest parking network in India.</p>
@@ -91,29 +91,29 @@
             </div>
             <div class="hero-visual animate-fade-in-up delay-2" aria-hidden="true">
               <div class="hero-card">
-                <div class="hero-card-title">Live availability &mdash; ParkEase Tech Park</div>
+                <div class="hero-card-title">Live availability &mdash; <span id="hero-facility-name">ParkEase Tech Park</span></div>
                 <div class="hero-availability">
                   <span style="display:flex;align-items:center;gap:10px;font-weight:600">
                     <span class="availability-dot"></span>
-                    <span style="font-size:0.9375rem">Open now &middot; 128 free slots</span>
+                    <span style="font-size:0.9375rem" id="hero-availability-text">Loading availability...</span>
                   </span>
-                  <span class="badge badge-success">
-                    <span class="badge-dot"></span>85% full
+                  <span class="badge badge-success" id="hero-occupancy-badge">
+                    <span class="badge-dot"></span><span id="hero-occupancy-text">--</span>
                   </span>
                 </div>
                 <div class="slot-grid" id="hero-slot-grid" style="grid-template-columns: repeat(6, 1fr)">
                 </div>
                 <div class="hero-stats">
                   <div class="hero-stat">
-                    <div class="hero-stat-value" id="hero-stat-cities">10</div>
+                    <div class="hero-stat-value" id="hero-stat-cities">-</div>
                     <div class="hero-stat-label">Cities</div>
                   </div>
                   <div class="hero-stat">
-                    <div class="hero-stat-value" id="hero-stat-facilities">20</div>
+                    <div class="hero-stat-value" id="hero-stat-facilities">-</div>
                     <div class="hero-stat-label">Facilities</div>
                   </div>
                   <div class="hero-stat">
-                    <div class="hero-stat-value" id="hero-stat-slots">3200+</div>
+                    <div class="hero-stat-value" id="hero-stat-slots">-</div>
                     <div class="hero-stat-label">Smart slots</div>
                   </div>
                 </div>
@@ -126,8 +126,7 @@
       <div class="container">
         <div class="search-box">
           <input type="text" id="home-search" class="form-input" placeholder="Search by city, area or facility name..." aria-label="Search parking">
-          <button class="btn btn-primary" data-home-search>Search</button>
-          <button class="btn btn-secondary" data-home-search-class="btn" data-view-link="facilities" style="display:none"></button>
+          <button class="btn btn-primary" id="home-search-btn">Search</button>
         </div>
       </div>
 

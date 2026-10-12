@@ -399,11 +399,13 @@
 
   window.AuthChanged = () => { refreshNavbar(); };
 
-  /* ============================================================
+/* ============================================================
      HOME
-  ============================================================ */
+   ============================================================ */
   async function loadHome() {
-    renderHeroSlots();
+    // Load hero stats from API
+    await loadHeroStats();
+    // Load city chips
     try {
       const res = await API.get('/facilities/cities');
       const cities = API.ensureOk(res).cities || [];
@@ -416,15 +418,105 @@
         navigate('facilities');
       }));
     } catch (e) { /* non-critical */ }
+
+    // Home search handler
+    const homeSearchBtn = $('#home-search-btn');
+    const homeSearchInput = $('#home-search');
+    if (homeSearchBtn && homeSearchInput) {
+      const doSearch = () => {
+        const q = homeSearchInput.value.trim();
+        if (q) {
+          state.facFilters.q = q;
+          state.facFilters.city = '';
+          navigate('facilities');
+        }
+      };
+      homeSearchBtn.addEventListener('click', doSearch);
+      homeSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doSearch();
+      });
+    }
   }
 
-  function renderHeroSlots() {
+  async function loadHeroStats() {
+    try {
+      // Get all facilities to compute totals
+      const res = await API.get('/facilities?per_page=100');
+      const data = API.ensureOk(res);
+      const facilities = data.facilities || [];
+      const cities = [...new Set(facilities.map(f => f.city))].length;
+
+      // Sum all slots
+      let totalSlots = 0;
+      let totalAvailable = 0;
+      facilities.forEach(f => {
+        const avail = f.available_slots || {};
+        const total = f.total_slots || {};
+        Object.values(total).forEach(v => totalSlots += v || 0);
+        Object.values(avail).forEach(v => totalAvailable += v || 0);
+      });
+
+      // Update hero stats
+      $('#hero-stat-cities').textContent = cities;
+      $('#hero-stat-facilities').textContent = facilities.length;
+      $('#hero-stat-slots').textContent = totalSlots.toLocaleString() + '+';
+      $('#hero-stats-badge').querySelector('#hero-stat-cities-label').textContent =
+        `${cities} cities \u00B7 ${facilities.length} facilities \u00B7 ${totalSlots.toLocaleString()}+ slots`;
+
+      // Load a featured facility for the hero card (first active one with good availability)
+      if (facilities.length) {
+        const featured = facilities.find(f => {
+          const avail = f.available_slots || {};
+          const total = f.total_slots || {};
+          let a = 0, t = 0;
+          Object.values(avail).forEach(v => a += v || 0);
+          Object.values(total).forEach(v => t += v || 0);
+          return t > 0 && a / t > 0.1; // at least 10% available
+        }) || facilities[0];
+
+        if (featured) {
+          $('#hero-facility-name').textContent = featured.name;
+          const avail = featured.available_slots || {};
+          const total = featured.total_slots || {};
+          let a = 0, t = 0;
+          Object.values(avail).forEach(v => a += v || 0);
+          Object.values(total).forEach(v => t += v || 0);
+          const pct = t > 0 ? Math.round((1 - a / t) * 100) : 0;
+          $('#hero-availability-text').textContent = `Open now \u00B7 ${a} free slots`;
+          $('#hero-occupancy-text').textContent = `${pct}% full`;
+
+          // Load its slots for the mini grid
+          try {
+            const sRes = await API.get('/facilities/' + featured.id + '/slots');
+            const slots = API.ensureOk(sRes).slots || [];
+            renderHeroSlotGrid(slots);
+          } catch (e) {
+            renderHeroSlotGrid([]);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load hero stats:', e);
+      // Fallback to placeholder
+      $('#hero-stat-cities').textContent = '-';
+      $('#hero-stat-facilities').textContent = '-';
+      $('#hero-stat-slots').textContent = '-';
+    }
+  }
+
+  function renderHeroSlotGrid(slots) {
     const box = $('#hero-slot-grid');
     if (!box) return;
-    const occ = [1, 2, 5, 13, 20, 27, 34];
+    // Show up to 36 slots, mixed types
+    const displaySlots = slots.slice(0, 36);
     let h = '';
-    for (let i = 1; i <= 36; i++) {
-      h += `<div class="slot ${occ.includes(i) ? 'occupied-style' : ''}" style="cursor:default" tabindex="-1"><span class="slot-code">C${i}</span></div>`;
+    displaySlots.forEach(s => {
+      const occupied = s.is_occupied;
+      h += `<div class="slot ${occupied ? 'occupied-style' : ''}" style="cursor:default" tabindex="-1"><span class="slot-code">${H.esc(s.slot_code)}</span></div>`;
+    });
+    // Fill remaining with placeholders if needed
+    for (let i = displaySlots.length; i < 36; i++) {
+      h += `<div class="slot occupied-style" style="cursor:default;opacity:0.3" tabindex="-1"><span class="slot-code">-</span></div>`;
     }
     box.innerHTML = h;
   }
@@ -461,24 +553,17 @@
     const params = new URLSearchParams({ page: state.facilitiesPage, per_page: 9 });
     if (state.facFilters.city) params.set('city', state.facFilters.city);
     if (state.facFilters.vehicle_type) params.set('vehicle_type', state.facFilters.vehicle_type);
+    if (state.facFilters.q) params.set('q', state.facFilters.q);
 
     try {
-      let facilities = [];
-      if (state.facFilters.q) {
-        const res = await API.get('/facilities/search?' + new URLSearchParams({ q: state.facFilters.q }));
-        facilities = API.ensureOk(res).facilities || [];
-        grid.innerHTML = '';
-        renderFacilityCards(grid, facilities);
-        if (!facilities.length) empty.classList.remove('d-none');
-      } else {
-        const res = await API.get('/facilities?' + params.toString());
-        const data = API.ensureOk(res);
-        facilities = data.facilities || [];
-        renderFacilityCards(grid, facilities);
-        const pages = data.pagination ? data.pagination.pages : 1;
-        renderPagination(pg, pages);
-        if (!facilities.length) empty.classList.remove('d-none');
-      }
+      const res = await API.get('/facilities?' + params.toString());
+      const data = API.ensureOk(res);
+      const facilities = data.facilities || [];
+      grid.innerHTML = '';
+      renderFacilityCards(grid, facilities);
+      const pages = data.pagination ? data.pagination.pages : 1;
+      renderPagination(pg, pages);
+      if (!facilities.length) empty.classList.remove('d-none');
     } catch (e) {
       grid.innerHTML = '';
       empty.classList.remove('d-none');
@@ -890,6 +975,10 @@
     const p = state.price;
     const box = $('#booking-modal-content');
     box.innerHTML = `
+      <div class="alert alert-info demo-banner" style="margin-bottom:var(--spacing-md);background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)">
+        <span>${I.shield}</span>
+        <strong>Demo Mode:</strong> Booking will be created but payment is simulated. No real money is charged.
+      </div>
       <div class="summary-item"><span class="label">Facility</span><span class="value">${H.esc(f.name)}</span></div>
       <div class="summary-item"><span class="label">Slots</span><span class="value">${state.selectedSlots.map(s => `<span class="badge badge-info" style="margin:2px">${H.esc(s)}</span>`).join(' ')}</span></div>
       <div class="summary-item"><span class="label">Start</span><span class="value">${H.fmtDT(dur.start.toISOString())}</span></div>
@@ -1089,7 +1178,7 @@
 
       if (method === 'wallet') {
         qrContainer.style.display = 'none';
-        st.innerHTML = '<div class="alert alert-info mt-2">Paying from your ParkEase wallet. Top up anytime.</div>';
+        st.innerHTML = '<div class="alert alert-info mt-2 demo-banner" style="background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)"><span>${I.shield}</span><strong>Demo Mode:</strong> Wallet payment is simulated. No real money is deducted.</div>';
       } else {
         qrContainer.style.display = 'block';
         st.innerHTML = '';
@@ -1125,6 +1214,10 @@
     const duration = durationLabel(booking.duration_value, booking.duration_unit);
 
     container.innerHTML = `
+      <div class="alert alert-info demo-banner" style="margin-bottom:var(--spacing-md);background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)">
+        <span>${I.shield}</span>
+        <strong>Demo Mode:</strong> Payment is simulated. No real money is charged. Use any UPI ID and upload a test screenshot for admin verification.
+      </div>
       <div class="upi-card">
         <div class="upi-card-head">
           <span class="upi-head-icon" aria-hidden="true">${I.wallet}</span>

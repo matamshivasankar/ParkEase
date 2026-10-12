@@ -138,6 +138,25 @@ class Facility(db.Model):
                 return []
         return []
 
+    def sync_availability(self):
+        """Recalculate available slot counts from the Slot table.
+
+        This ensures the denormalized available_xxx fields stay in sync with
+        the actual Slot.is_occupied state. Call after booking changes.
+        """
+        from backend.models import Slot
+        counts = {v: 0 for v in ['car', 'bike', 'truck', 'ev']}
+        for slot in self.slots:
+            if not slot.is_occupied:
+                key = slot.vehicle_type.lower()
+                if key in counts:
+                    counts[key] += 1
+
+        self.available_car = counts['car']
+        self.available_bike = counts['bike']
+        self.available_truck = counts['truck']
+        self.available_ev = counts['ev']
+
     def to_dict(self, include_slots=False):
         data = {
             'id': self.id,

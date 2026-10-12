@@ -387,6 +387,12 @@ def admin_verify_screenshot(payment_id):
 
     db.session.commit()
 
+    # Sync availability counts
+    facility = Facility.query.get(booking.facility_id)
+    if facility:
+        facility.sync_availability()
+        db.session.commit()
+
     # Emit real-time updates
     emit_payment_update(booking.id, payment.status, payment.to_dict())
     # Emit booking status update for real-time UI update

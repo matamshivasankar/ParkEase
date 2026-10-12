@@ -43,10 +43,13 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'parkease-jwt-secret-change-in-production')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
-    JWT_TOKEN_LOCATION = ['headers', 'cookies']
-    JWT_COOKIE_CSRF_PROTECT = False
-    JWT_COOKIE_SECURE = False
-    JWT_CSRF_IN_COOKIES = False
+    JWT_TOKEN_LOCATION = ['cookies', 'headers']
+    JWT_COOKIE_CSRF_PROTECT = True
+    JWT_COOKIE_SECURE = False  # True in production
+    JWT_CSRF_IN_COOKIES = True
+    JWT_COOKIE_SAMESITE = 'Lax'
+    JWT_ACCESS_COOKIE_PATH = '/'
+    JWT_REFRESH_COOKIE_PATH = '/api/auth/refresh'
 
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -117,6 +120,7 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
+    JWT_COOKIE_CSRF_PROTECT = False
     # Uploads during tests go to a scratch folder so runs never litter
     # backend/screenshots with throwaway 1x1 pixels.
     SCREENSHOT_FOLDER = os.path.join(

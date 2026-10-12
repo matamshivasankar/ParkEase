@@ -5,7 +5,7 @@ import json
 
 from backend.models import db, Booking, Slot, Facility, Vehicle, User
 from backend.utils.helpers import (calculate_price, generate_booking_id, lock_slots,
-                                release_slots, parse_client_datetime, utcnow)
+                                release_slots, lock_slots_for_booking, parse_client_datetime, utcnow)
 from backend.utils.qr_generator import generate_qr_code
 from backend.middleware.auth_middleware import admin_required, get_current_user_id
 
@@ -96,22 +96,18 @@ def create_booking():
     if vehicle_error:
         return jsonify({'error': vehicle_error}), 400
 
-    slots = Slot.query.filter(
-        Slot.facility_id == facility.id,
-        Slot.slot_code.in_(slot_codes),
-        Slot.vehicle_type == data['vehicle_type']
-    ).all()
-
-    if len(slots) != len(slot_codes):
-        return jsonify({'error': 'One or more slots not found'}), 404
-
-    for slot in slots:
-        if not slot.is_available(start_time, end_time):
-            return jsonify({'error': f'Slot {slot.slot_code} is not available for selected time'}), 409
-
-    locked = lock_slots(slots, end_time)
+    # Atomically lock slots using SELECT FOR UPDATE to prevent race conditions
+    locked, result = lock_slots_for_booking(
+        slot_codes=slot_codes,
+        facility_id=facility.id,
+        vehicle_type=data['vehicle_type'],
+        start_time=start_time,
+        end_time=end_time
+    )
     if not locked:
-        return jsonify({'error': 'Failed to lock slots. Try again.'}), 409
+        return jsonify({'error': result}), 409
+
+    slots = result
 
     try:
         price_data = calculate_price(
@@ -158,6 +154,10 @@ def create_booking():
 
         db.session.commit()
 
+        # Sync availability counts
+        facility.sync_availability()
+        db.session.commit()
+
         return jsonify({
             'message': 'Booking created successfully',
             'booking': booking.to_dict(),
@@ -165,7 +165,7 @@ def create_booking():
         }), 201
 
     except Exception as e:
-        release_slots(slots, facility_id=facility.id)
+        release_slots(slot_codes, facility_id=facility.id)
         db.session.rollback()
         return jsonify({'error': 'Failed to create booking'}), 500
 
@@ -278,6 +278,11 @@ def modify_booking(booking_id):
     booking.total_amount = price_data['total_amount']
 
     db.session.commit()
+
+    # Sync availability counts
+    facility.sync_availability()
+    db.session.commit()
+
     return jsonify({'message': 'Booking modified', 'booking': booking.to_dict()}), 200
 
 
@@ -320,6 +325,12 @@ def cancel_booking(booking_id):
     booking.status = 'cancelled'
     db.session.commit()
 
+    # Sync availability counts
+    facility = Facility.query.get(booking.facility_id)
+    if facility:
+        facility.sync_availability()
+        db.session.commit()
+
     return jsonify({'message': 'Booking cancelled', 'booking': booking.to_dict()}), 200
 
 
@@ -354,6 +365,13 @@ def checkin(booking_id):
             slot.occupied_until = booking.end_time
 
     db.session.commit()
+
+    # Sync availability counts
+    facility = Facility.query.get(booking.facility_id)
+    if facility:
+        facility.sync_availability()
+        db.session.commit()
+
     return jsonify({'message': 'Check-in successful', 'booking': booking.to_dict()}), 200
 
 
@@ -382,6 +400,13 @@ def checkout(booking_id):
             slot.occupied_until = None
 
     db.session.commit()
+
+    # Sync availability counts
+    facility = Facility.query.get(booking.facility_id)
+    if facility:
+        facility.sync_availability()
+        db.session.commit()
+
     return jsonify({'message': 'Check-out successful', 'booking': booking.to_dict()}), 200
 
 

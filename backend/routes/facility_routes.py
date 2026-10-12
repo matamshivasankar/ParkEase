@@ -25,6 +25,7 @@ def haversine(lat1, lon1, lat2, lon2):
 def get_facilities():
     city = request.args.get('city')
     vehicle_type = request.args.get('vehicle_type')
+    q = request.args.get('q', '').strip()
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
     latitude = request.args.get('latitude', type=float)
@@ -34,6 +35,16 @@ def get_facilities():
     per_page = int(request.args.get('per_page', 20))
 
     query = Facility.query.filter_by(is_active=True)
+
+    if q:
+        query = query.filter(
+            or_(
+                Facility.name.ilike(f'%{q}%'),
+                Facility.area.ilike(f'%{q}%'),
+                Facility.city.ilike(f'%{q}%'),
+                Facility.street.ilike(f'%{q}%')
+            )
+        )
 
     if city:
         query = query.filter(Facility.city.ilike(f'%{city}%'))

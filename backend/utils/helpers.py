@@ -119,12 +119,18 @@ def generate_booking_id():
 
 
 def lock_slots(slots, end_time):
+    """Lock slots for booking using SELECT FOR UPDATE to prevent race conditions.
+
+    This must be called within a database transaction. The slots are marked as
+    occupied with the booking's end_time so they won't be available for other
+    bookings overlapping this time range.
+    """
     try:
         for slot in slots:
             slot.is_occupied = True
             slot.occupied_until = end_time
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -145,8 +151,44 @@ def release_slots(slot_codes, facility_id=None):
             slot.is_occupied = False
             slot.occupied_until = None
         return True
-    except:
+    except Exception:
         return False
+
+
+def lock_slots_for_booking(slot_codes, facility_id, vehicle_type, start_time, end_time):
+    """Atomically lock slots for a new booking using SELECT FOR UPDATE.
+
+    Returns (success, slots_or_error_message).
+    On success, returns (True, list_of_locked_slot_objects).
+    On failure, returns (False, error_message).
+    """
+    from backend.models import Slot, db
+    try:
+        # Use SELECT FOR UPDATE to lock the rows and prevent concurrent modifications
+        slots = Slot.query.filter(
+            Slot.facility_id == facility_id,
+            Slot.slot_code.in_(slot_codes),
+            Slot.vehicle_type == vehicle_type
+        ).with_for_update(nowait=True).all()
+
+        if len(slots) != len(slot_codes):
+            return False, f'One or more slots not found (found {len(slots)} of {len(slot_codes)})'
+
+        for slot in slots:
+            if not slot.is_available(start_time, end_time):
+                return False, f'Slot {slot.slot_code} is not available for the selected time'
+
+        # All slots available - lock them
+        for slot in slots:
+            slot.is_occupied = True
+            slot.occupied_until = end_time
+
+        db.session.flush()
+        return True, slots
+
+    except Exception as e:
+        # Could be a lock timeout (nowait) or other DB error
+        return False, 'Could not lock slots - they may be booked by another user. Please try again.'
 
 
 def format_currency(amount):

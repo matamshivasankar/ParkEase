@@ -1,16 +1,13 @@
-/* ParkEase API client */
+/* ParkEase API client - uses httpOnly cookies for authentication */
 const API = (() => {
   const BASE = '/api';
-  const TOKEN_KEY = 'parkease_access_token';
   const userStore = {
-    get token() { return localStorage.getItem(TOKEN_KEY); },
-    set token(v) { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); },
     get user() {
       try { return JSON.parse(localStorage.getItem('parkease_user')); }
       catch (e) { return null; }
     },
     set user(u) { u ? localStorage.setItem('parkease_user', JSON.stringify(u)) : localStorage.removeItem('parkease_user'); },
-    clear() { this.token = null; this.user = null; }
+    clear() { this.user = null; }
   };
 
   let refreshPromise = null;
@@ -21,7 +18,7 @@ const API = (() => {
       .then(res => res.json())
       .then(data => {
         if (data.access_token) {
-          userStore.token = data.access_token;
+          // Access token is set in httpOnly cookie by backend
           return data.access_token;
         }
         throw new Error('Refresh failed');
@@ -32,7 +29,7 @@ const API = (() => {
 
   async function request(path, { method = 'GET', body = null } = {}) {
     const headers = { 'Content-Type': 'application/json' };
-    if (userStore.token) headers.Authorization = `Bearer ${userStore.token}`;
+    // No Authorization header needed - httpOnly cookies handle auth automatically
 
     const opts = { method, headers, credentials: 'include' };
     if (body) opts.body = JSON.stringify(body);
@@ -40,11 +37,9 @@ const API = (() => {
     let res = await fetch(BASE + path, opts);
 
     // Try a token refresh once on 401
-    if (res.status === 401 && userStore.token) {
+    if (res.status === 401) {
       try {
-        const newToken = await refreshToken();
-        headers.Authorization = `Bearer ${newToken}`;
-        opts.headers = headers;
+        await refreshToken();
         res = await fetch(BASE + path, opts);
       } catch (e) {
         userStore.clear();
@@ -84,13 +79,10 @@ const API = (() => {
   // image renders even when the cookie is missing or blocked.
   async function fetchImage(path) {
     const url = path.startsWith('/') ? path : '/' + path;
-    const headers = {};
-    if (userStore.token) headers.Authorization = `Bearer ${userStore.token}`;
-
-    let res = await fetch(url, { headers, credentials: 'include' });
-    if (res.status === 401 && userStore.token) {
-      const newToken = await refreshToken();
-      res = await fetch(url, { headers: { Authorization: `Bearer ${newToken}` }, credentials: 'include' });
+    let res = await fetch(url, { credentials: 'include' });
+    if (res.status === 401) {
+      await refreshToken();
+      res = await fetch(url, { credentials: 'include' });
     }
     if (!res.ok) throw Object.assign(new Error('Image request failed'), { status: res.status });
     return URL.createObjectURL(await res.blob());
@@ -115,7 +107,6 @@ const Auth = (() => {
     if (typeof window.AuthChanged === 'function') window.AuthChanged(user);
   }
   function saveSession(data) {
-    if (data.access_token) API.userStore.token = data.access_token;
     if (data.user) API.userStore.user = data.user;
     onAuthChange();
   }
@@ -128,7 +119,7 @@ const Auth = (() => {
     if (window.Parkease) Parkease.showToast('Your session has expired. Please sign in again.', 'warning');
   }
   return {
-    isLoggedIn() { return !!(API.userStore.token || API.userStore.user); },
+    isLoggedIn() { return !!API.userStore.user; },
     get user() { return API.userStore.user; },
     saveSession,
     logout,
