@@ -78,6 +78,24 @@ const API = (() => {
     return res.data;
   }
 
+  // Payment screenshots sit behind auth, but an <img src> cannot carry the
+  // Bearer header - it would depend entirely on the access-token cookie being
+  // present. Fetch with the header and hand back an object URL instead, so the
+  // image renders even when the cookie is missing or blocked.
+  async function fetchImage(path) {
+    const url = path.startsWith('/') ? path : '/' + path;
+    const headers = {};
+    if (userStore.token) headers.Authorization = `Bearer ${userStore.token}`;
+
+    let res = await fetch(url, { headers, credentials: 'include' });
+    if (res.status === 401 && userStore.token) {
+      const newToken = await refreshToken();
+      res = await fetch(url, { headers: { Authorization: `Bearer ${newToken}` }, credentials: 'include' });
+    }
+    if (!res.ok) throw Object.assign(new Error('Image request failed'), { status: res.status });
+    return URL.createObjectURL(await res.blob());
+  }
+
   return {
     get: (p) => request(p),
     post: (p, body) => request(p, { method: 'POST', body }),
@@ -86,6 +104,7 @@ const API = (() => {
     request,
     ensureOk,
     handleError,
+    fetchImage,
     userStore
   };
 })();

@@ -76,6 +76,40 @@
     }
   };
 
+  /* ---------- Protected images ----------
+     Screenshots live behind auth, and a bare <img src> only ever sends cookies.
+     These helpers load them through API.fetchImage (Bearer header) and swap in
+     an object URL, so the admin queue renders even when the cookie is missing. */
+  const objectUrls = new Set();
+
+  function releaseObjectUrls() {
+    objectUrls.forEach(u => URL.revokeObjectURL(u));
+    objectUrls.clear();
+  }
+
+  async function mountProtectedImage(img, url) {
+    if (!img || !url) return;
+    try {
+      const objUrl = await API.fetchImage(url);
+      objectUrls.add(objUrl);
+      if (img.isConnected) img.src = objUrl;
+      img.dataset.mounted = '1';
+    } catch (e) {
+      if (!img.isConnected) return;
+      img.dataset.mounted = 'error';
+      const wrap = img.closest('.verify-shot') || img.parentElement;
+      if (wrap) {
+        wrap.innerHTML = `<div class="alert alert-warning" style="margin:0">
+          ${I.alert} Screenshot could not be loaded (HTTP ${e.status || 'error'}). Use Refresh to try again.
+        </div>`;
+      }
+    }
+  }
+
+  function mountProtectedImages(root) {
+    $$('[data-shot-src]', root).forEach(img => mountProtectedImage(img, img.dataset.shotSrc));
+  }
+
   /* ---------- Toast ---------- */
   const Toast = {
     show(message, type = 'info', title = '') {
@@ -1473,6 +1507,7 @@
                 <span class="badge ${H.badge(b.payment_status)}">${H.esc(b.payment_status)}</span>
                 ${b.payment_status === 'pending_verification' ? `<button class="btn btn-sm btn-primary" data-repay="${b.id}">View payment</button>` : ''}
                 ${b.payment_status === 'paid' && ['reserved', 'confirmed'].includes(b.status) ? `<button class="btn btn-sm btn-outline" data-checkin="${b.id}">Check in</button>` : ''}
+                ${b.status === 'active' ? `<button class="btn btn-sm btn-primary" data-checkout="${b.id}">Check out</button>` : ''}
                 ${['reserved', 'confirmed', 'active'].includes(b.status) ? `<button class="btn btn-sm btn-danger" data-cancel="${b.id}">Cancel</button>` : ''}
                 ${b.check_in_time ? `<a class="btn btn-sm btn-secondary" href="/api/bookings/${b.id}/receipt" target="_blank">Receipt</a>` : ''}
               </span>
@@ -1481,6 +1516,7 @@
         </div>`).join('');
 
       $$('[data-checkin]', box).forEach(b => b.addEventListener('click', () => checkIn(Number(b.dataset.checkin))));
+      $$('[data-checkout]', box).forEach(b => b.addEventListener('click', () => checkOut(Number(b.dataset.checkout))));
       $$('[data-cancel]', box).forEach(b => b.addEventListener('click', () => cancelBooking(Number(b.dataset.cancel))));
       $$('[data-recheck]', box).forEach(b => b.addEventListener('click', () => checkPaymentStatus(Number(b.dataset.recheck), true)));
       // Re-open the payment modal so a user can see the pending state or retry
@@ -1489,6 +1525,8 @@
         const booking = list.find(x => String(x.id) === b.dataset.repay);
         if (booking) openPayment(booking);
       }));
+
+      scheduleLifecycleRefresh(list);
     } catch (e) {
       box.innerHTML = '<div class="empty-state"><p>Could not load your bookings.</p></div>';
     }
@@ -1503,6 +1541,43 @@
       const info = API.handleError({ status: e && e.status, data: e && e.data });
       Toast.error(info.message);
     }
+  }
+
+  async function checkOut(id) {
+    try {
+      await API.post(`/bookings/${id}/checkout`);
+      Toast.success('Checked out. Your slot is free again.');
+      loadUserBookings();
+    } catch (e) {
+      const info = API.handleError({ status: e && e.status, data: e && e.data });
+      Toast.error(info.message);
+    }
+  }
+
+  /* A checked-in booking completes itself once its end time passes, but the
+     list on screen would otherwise keep showing it as active until a manual
+     reload. Re-fetch shortly after the nearest end time so the flip to
+     "completed" appears on its own. */
+  let lifecycleTimer = null;
+
+  function scheduleLifecycleRefresh(list) {
+    if (lifecycleTimer) { clearTimeout(lifecycleTimer); lifecycleTimer = null; }
+
+    const ends = (list || [])
+      .filter(b => b.status === 'active' && b.end_time)
+      .map(b => new Date(b.end_time).getTime() - Date.now())
+      .filter(ms => Number.isFinite(ms));
+
+    if (!ends.length) return;
+
+    // Wake just after the soonest end time. Capped so a long stay still
+    // re-checks periodically instead of sleeping for hours.
+    const wait = Math.min(Math.max(Math.min(...ends) + 5000, 5000), 10 * 60 * 1000);
+    lifecycleTimer = setTimeout(() => {
+      lifecycleTimer = null;
+      if (document.visibilityState === 'visible') loadUserBookings();
+      else scheduleLifecycleRefresh(list);
+    }, wait);
   }
 
   async function cancelBooking(id) {
@@ -1738,6 +1813,7 @@ async function loadAdmin() {
   }
 
   /* ---------- Verification queue ---------- */
+  let lastQueueSignature = null;
   async function loadAdminVerifications(quiet) {
     const box = $('#admin-verifications-body');
     if (!box) return;
@@ -1754,6 +1830,12 @@ async function loadAdmin() {
         count.textContent = items.length;
         count.classList.toggle('d-none', items.length < 1);
       }
+
+      // A quiet refresh exists only to surface new uploads. If the set of
+      // payments is unchanged, leave the DOM (and its loaded images) alone.
+      const signature = items.map(i => i.payment_id + ':' + (i.screenshot_file || '')).join('|');
+      if (quiet && signature === lastQueueSignature && box.children.length) return;
+      lastQueueSignature = signature;
 
       if (!items.length) {
         box.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${I.shield}</div><h3>Nothing to verify</h3><p>No payment screenshots are waiting for review.</p></div>`;
@@ -1785,7 +1867,7 @@ async function loadAdmin() {
             </div>
             <div class="verify-shot">
               ${v.screenshot_url
-                ? `<img src="${H.esc(v.screenshot_url)}" alt="Payment screenshot for ${H.esc(v.booking.booking_id)}" loading="lazy" data-shot="${v.payment_id}">
+                ? `<img alt="Payment screenshot for ${H.esc(v.booking.booking_id)}" data-shot-src="${H.esc(v.screenshot_url)}" data-shot="${v.payment_id}">
                    <button type="button" class="btn btn-secondary btn-sm mt-2" data-shot-open="${v.payment_id}">${I.eye} Open full size</button>`
                 : '<div class="text-muted" style="padding:var(--spacing-lg);text-align:center">No screenshot was attached.</div>'}
             </div>
@@ -1795,10 +1877,18 @@ async function loadAdmin() {
           </div>
         </div>`).join('');
 
+      releaseObjectUrls();
+      mountProtectedImages(box);
+
       $$('[data-verify-open]', box).forEach(b => b.addEventListener('click', () => openVerifyScreenshot(b.dataset.verifyOpen)));
       $$('[data-shot-open]', box).forEach(b => {
         const img = $(`[data-shot="${b.dataset.shotOpen}"]`, box);
-        if (img) b.addEventListener('click', () => window.open(img.src, '_blank'));
+        if (!img) return;
+        b.addEventListener('click', async () => {
+          // The blob may still be loading; wait for it so the tab is never blank.
+          if (!img.src) await mountProtectedImage(img, img.dataset.shotSrc);
+          if (img.src) window.open(img.src, '_blank');
+        });
       });
     } catch (e) {
       box.innerHTML = '<div class="empty-state"><p>Could not load the verification queue.</p></div>';
@@ -1903,7 +1993,7 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
           <div class="card" style="padding:var(--spacing-md);text-align:center">
             <label class="form-label" style="display:block;text-align:left">Payment Screenshot</label>
             ${item.screenshot_url ? `
-              <img src="${H.esc(item.screenshot_url)}" alt="Payment screenshot" style="max-width:100%;max-height:420px;border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:zoom-in" data-verify-shot>
+              <img alt="Payment screenshot" style="max-width:100%;max-height:420px;border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:zoom-in" data-verify-shot data-shot-src="${H.esc(item.screenshot_url)}">
               <p class="text-muted small mt-1">Click the image to open it full size</p>
             ` : '<p class="text-muted">No screenshot available</p>'}
           </div>
@@ -1921,7 +2011,11 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
       Modal.open('success-modal');
 
       const shot = $('[data-verify-shot]', body);
-      if (shot) shot.addEventListener('click', () => window.open(shot.src, '_blank'));
+      mountProtectedImage(shot, shot && shot.dataset.shotSrc);
+      if (shot) shot.addEventListener('click', async () => {
+        if (!shot.src) await mountProtectedImage(shot, shot.dataset.shotSrc);
+        if (shot.src) window.open(shot.src, '_blank');
+      });
 
       const approve = $('#btn-approve');
       const reject = $('#btn-reject');
@@ -2227,6 +2321,17 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
     $$('[data-admin-tab]').forEach(b => b.addEventListener('click', () => adminTab(b.dataset.adminTab)));
     const avr = $('[data-verify-refresh]');
     if (avr) avr.addEventListener('click', () => { loadAdminVerifications(); loadAdminStats(); });
+
+    // Socket pushes only arrive while the socket is connected, so an admin tab
+    // left open could sit on a stale queue and never show a fresh upload.
+    // Poll quietly while the Verifications panel is actually on screen.
+    setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (!Auth.user || Auth.user.role !== 'admin') return;
+      const panel = $('[data-admin-panel="verifications"]');
+      if (!panel || !panel.classList.contains('active')) return;
+      loadAdminVerifications(true);
+    }, 20000);
     const abs = $('#admin-booking-status');
     if (abs) abs.addEventListener('change', loadAdminBookings);
     const aus = $('#admin-user-search');

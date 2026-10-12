@@ -4,6 +4,7 @@ from datetime import datetime
 
 from backend.models import db, User, Vehicle, Booking
 from backend.middleware.auth_middleware import get_current_user_id
+from backend.utils.lifecycle import complete_expired_bookings
 from backend.utils.validators import validate_vehicle
 
 user_bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -133,6 +134,9 @@ def get_user_bookings():
     user = User.query.get(current_user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
+
+    # An elapsed booking must read back as completed, not sit on `active`.
+    complete_expired_bookings(current_user_id)
 
     status = request.args.get('status')
     page = int(request.args.get('page', 1))

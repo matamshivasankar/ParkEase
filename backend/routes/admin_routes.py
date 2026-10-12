@@ -9,6 +9,7 @@ import json
 from backend.models import db, User, Facility, Booking, Slot, Payment
 from backend.middleware.auth_middleware import admin_required
 from backend.utils.helpers import utcnow, parse_client_datetime, iso_utc
+from backend.utils.lifecycle import complete_expired_bookings
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -38,6 +39,8 @@ def _payment_screenshot_file(payment):
 @jwt_required()
 @admin_required
 def dashboard():
+    complete_expired_bookings()
+
     total_users = User.query.filter_by(role='user').count()
     total_facilities = Facility.query.filter_by(is_active=True).count()
     total_bookings = Booking.query.count()
@@ -177,6 +180,8 @@ def revenue_analytics():
 @jwt_required()
 @admin_required
 def get_all_bookings():
+    complete_expired_bookings()
+
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     status = request.args.get('status')
