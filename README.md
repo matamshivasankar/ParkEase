@@ -68,6 +68,15 @@ State changes are pushed to connected browsers over Socket.IO, so bookings, paym
 - **Revenue analytics** — daily revenue, revenue by vehicle type and top facilities.
 - **CSV reports** — export bookings and revenue for a date range.
 
+### Admin Panel UI
+The admin dashboard is a single-page interface accessible at `/admin` (requires admin role). It features:
+- **Verifications tab** — real-time payment screenshot queue with image preview, transaction details, and approve/reject actions with mandatory rejection notes.
+- **Bookings tab** — paginated, filterable table of all bookings with quick access to verification and receipt download.
+- **Users tab** — searchable user list with role badges, wallet balance, block/unblock toggle.
+- **Facilities tab** — list of all facilities (including inactive) with slot counts, ratings, and a modal to create new facilities with auto-generated slot inventory.
+- **Revenue tab** — 30-day revenue breakdown by vehicle type, daily booking trends, and top-performing facilities.
+- **Live updates** — the verifications queue auto-refreshes every 20s and receives instant Socket.IO notifications when new screenshots are submitted.
+
 ### Platform
 - JWT authentication (access + refresh) via headers **and** cookies, with refresh-token rotation.
 - Rate limiting (Flask-Limiter), CORS, request validation, hashed passwords (Werkzeug).
@@ -449,6 +458,19 @@ pytest --cov=backend
 `TestingConfig` uses an in-memory SQLite database and writes uploads to a temporary folder, so test runs never touch your real data or leave files behind.
 
 > Set `FLASK_ENV=testing` when building an app context in tests.
+
+### Test Suite Coverage
+- **Price calculation** — hourly, multi-slot, weekly, weekend, early-bird, and monthly discounts with GST.
+- **Slot locking** — successful locks, conflict detection, and release.
+- **Booking validation** — 1:1 vehicle-per-slot rule, duplicate detection, missing numbers.
+- **Input validators** — registration, login, and vehicle data validation.
+- **DateTime helpers** — ISO parsing with/without offsets, UTC formatting.
+- **Facility availability sync** — denormalized counts stay in sync with Slot table.
+- **Auth flow** — register, login, token verify, logout.
+- **Booking flow** — create booking, price estimate endpoints.
+
+### Test Client Notes
+When using Flask's test client with JWT cookies, subsequent requests automatically include the `access_token_cookie`. For `Authorization: Bearer` header testing, use `test_request_context` or `environ_overrides={'HTTP_AUTHORIZATION': 'Bearer <token>'}` as the test client may not propagate the header on POST requests in-process.
 
 ---
 
