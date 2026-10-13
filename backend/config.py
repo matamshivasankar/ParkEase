@@ -115,6 +115,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     JWT_COOKIE_SECURE = True
+    JWT_COOKIE_SAMESITE = 'None'
 
 class TestingConfig(Config):
     TESTING = True
