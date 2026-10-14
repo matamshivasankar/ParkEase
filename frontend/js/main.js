@@ -68,7 +68,7 @@
         pending_verification: 'badge-warning', pending_screenshot: 'badge-warning',
         paid: 'badge-success', refunded: 'badge-info', failed: 'badge-danger'
       };
-      return map[status] || 'badge-secondary';
+      return map[status] || 'badge-neutral';
     },
     label(status) {
       const map = { pending_verification: 'Awaiting verification' };
@@ -364,6 +364,10 @@
     if (menu) menu.classList.remove('active');
     const tg = $('[data-nav-toggle]');
     if (tg) tg.setAttribute('aria-expanded', 'false');
+    
+    // Close notification panel too
+    const notifWrap = $('[data-notif]');
+    if (notifWrap) notifWrap.classList.remove('open');
   }
 
   /* ============================================================
@@ -512,11 +516,11 @@
     let h = '';
     displaySlots.forEach(s => {
       const occupied = s.is_occupied;
-      h += `<div class="slot ${occupied ? 'occupied-style' : ''}" style="cursor:default" tabindex="-1"><span class="slot-code">${H.esc(s.slot_code)}</span></div>`;
+      h += `<div class="slot ${occupied ? 'occupied' : ''}" style="cursor:default" tabindex="-1"><span class="slot-code">${H.esc(s.slot_code)}</span></div>`;
     });
     // Fill remaining with placeholders if needed
     for (let i = displaySlots.length; i < 36; i++) {
-      h += `<div class="slot occupied-style" style="cursor:default;opacity:0.3" tabindex="-1"><span class="slot-code">-</span></div>`;
+      h += `<div class="slot occupied" style="cursor:default;opacity:0.3" tabindex="-1"><span class="slot-code">-</span></div>`;
     }
     box.innerHTML = h;
   }
@@ -2201,7 +2205,7 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
 	          <td>${Object.values(total).reduce((a, b) => a + (b || 0), 0)}</td>
 	          <td>${Object.values(avail).reduce((a, b) => a + (b || 0), 0)}</td>
 	          <td>${Number(f.rating || 0).toFixed(1)}</td>
-	          <td><span class="badge ${f.is_active ? 'badge-success' : 'badge-secondary'}">${f.is_active ? 'Active' : 'Inactive'}</span></td>
+	          <td><span class="badge ${f.is_active ? 'badge-success' : 'badge-neutral'}">${f.is_active ? 'Active' : 'Inactive'}</span></td>
 	          <td><a class="btn btn-sm btn-outline" href="#" data-view-fac="${f.id}">View</a></td>
 	        </tr>`;
 	      }).join('') || `<tr><td colspan="7"><div class="empty-state"><p>No facilities.</p></div></td></tr>`;
