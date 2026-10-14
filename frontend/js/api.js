@@ -10,15 +10,22 @@ const API = (() => {
     clear() { this.user = null; }
   };
 
+  function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|; )csrf_access_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
   let refreshPromise = null;
 
   function refreshToken() {
     if (refreshPromise) return refreshPromise;
-    refreshPromise = fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+    const csrf = getCsrfToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+    refreshPromise = fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include', headers })
       .then(res => res.json())
       .then(data => {
         if (data.access_token) {
-          // Access token is set in httpOnly cookie by backend
           return data.access_token;
         }
         throw new Error('Refresh failed');
@@ -29,7 +36,10 @@ const API = (() => {
 
   async function request(path, { method = 'GET', body = null } = {}) {
     const headers = { 'Content-Type': 'application/json' };
-    // No Authorization header needed - httpOnly cookies handle auth automatically
+    const csrf = getCsrfToken();
+    if (csrf && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+      headers['X-CSRF-TOKEN'] = csrf;
+    }
 
     const opts = { method, headers, credentials: 'include' };
     if (body) opts.body = JSON.stringify(body);
@@ -112,7 +122,10 @@ const Auth = (() => {
   }
   function logout() {
     API.userStore.clear();
-    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    const csrf = getCsrfToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include', headers }).catch(() => {});
     onAuthChange();
   }
   function flagSessionExpired() {
