@@ -12,9 +12,6 @@
   border-bottom: 1px solid var(--color-border);
   height: var(--header-height);
 }
-@media (prefers-color-scheme: dark) {
-  .navbar { background: rgba(15, 23, 42, 0.96); border-bottom-color: var(--color-border); }
-}
 
 .navbar-inner {
   display: flex;
@@ -118,9 +115,6 @@
   background: linear-gradient(180deg, var(--color-neutral-50) 0%, var(--color-bg) 100%);
   position: relative;
   overflow: hidden;
-}
-@media (prefers-color-scheme: dark) {
-  .hero { background: linear-gradient(180deg, var(--color-neutral-900) 0%, var(--color-bg) 100%); }
 }
 
 .hero::before {
@@ -415,9 +409,6 @@
   justify-content: center;
   padding: var(--space-10) var(--space-4);
   background: linear-gradient(135deg, var(--color-neutral-50) 0%, var(--color-bg) 60%);
-}
-@media (prefers-color-scheme: dark) {
-  .auth-page { background: linear-gradient(135deg, var(--color-neutral-900) 0%, var(--color-bg) 60%); }
 }
 .auth-card {
   width: 100%;
