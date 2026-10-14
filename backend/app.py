@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager, decode_token
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import re
 
@@ -39,6 +40,8 @@ def create_app(config_name=None, with_socketio=False):
 
     app = Flask(__name__, static_folder='../frontend')
     app.config.from_object(config[config_name])
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     db.init_app(app)
     jwt = JWTManager(app)
