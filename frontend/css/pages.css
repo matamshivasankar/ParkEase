@@ -244,14 +244,14 @@
 .table-actions { display: flex; gap: var(--space-1); }
 .icon-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px;
+  width: 32px; height: 32px;
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   transition: all var(--duration-fast);
 }
 .icon-btn:hover { background: var(--color-bg-hover); color: var(--color-brand); }
 .icon-btn.danger:hover { background: var(--color-status-danger-bg); color: var(--color-danger); }
-.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn svg { width: 16px; height: 16px; }
 
 /* ---------- Revenue Cards ---------- */
 .revenue-breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
