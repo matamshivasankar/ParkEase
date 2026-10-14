@@ -163,6 +163,21 @@ def create_app(config_name=None, with_socketio=False):
     with app.app_context():
         db.create_all()
 
+        from backend.models import User
+        admin_email = 'admin@parkease.com'
+        if not User.query.filter_by(email=admin_email).first():
+            admin = User(
+                full_name='Administrator',
+                email=admin_email,
+                phone='9999999999',
+                role='admin'
+            )
+            admin.set_password('Admin@123')
+            admin.user_id = admin.generate_user_id()
+            db.session.add(admin)
+            db.session.commit()
+            print(f"Created default admin: {admin_email}")
+
     return app
 
 
