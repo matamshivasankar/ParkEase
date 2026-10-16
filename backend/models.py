@@ -433,6 +433,91 @@ class Payment(db.Model):
         }
 
 
+class WalletRecharge(db.Model):
+    """Wallet recharge requests submitted by users for admin verification."""
+    __tablename__ = 'wallet_recharges'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    recharge_id = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    amount = db.Column(db.Float, nullable=False)
+    transaction_id = db.Column(db.String(100), nullable=False, index=True)
+    screenshot_file = db.Column(db.String(255))
+    status = db.Column(db.String(20), default='pending_verification', index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    admin_notes = db.Column(db.Text)
+    rejected_reason = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    verified_at = db.Column(db.DateTime)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='wallet_recharges')
+    admin = db.relationship('User', foreign_keys=[admin_id])
+
+    def generate_recharge_id(self):
+        count = WalletRecharge.query.count() + 1
+        return f"RCH-{datetime.now().year}-{count:05d}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'recharge_id': self.recharge_id,
+            'user_id': self.user_id,
+            'user_name': self.user.full_name if self.user else None,
+            'user_email': self.user.email if self.user else None,
+            'amount': self.amount,
+            'transaction_id': self.transaction_id,
+            'screenshot_file': self.screenshot_file,
+            'screenshot_url': f'/screenshots/{self.screenshot_file}' if self.screenshot_file else None,
+            'status': self.status,
+            'admin_id': self.admin_id,
+            'admin_name': self.admin.full_name if self.admin else None,
+            'admin_notes': self.admin_notes,
+            'rejected_reason': self.rejected_reason,
+            'created_at': iso_utc(self.created_at),
+            'updated_at': iso_utc(self.updated_at),
+            'verified_at': iso_utc(self.verified_at)
+        }
+
+
+class WalletTransaction(db.Model):
+    """Wallet transaction history for audit trail."""
+    __tablename__ = 'wallet_transactions'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    transaction_id = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    type = db.Column(db.String(20), nullable=False)  # 'credit', 'debit'
+    amount = db.Column(db.Float, nullable=False)
+    balance_before = db.Column(db.Float, nullable=False)
+    balance_after = db.Column(db.Float, nullable=False)
+    description = db.Column(db.String(255))
+    reference_type = db.Column(db.String(20))  # 'recharge', 'booking', 'refund', 'manual'
+    reference_id = db.Column(db.Integer)  # ID of related record
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    user = db.relationship('User', backref='wallet_transactions')
+
+    def generate_transaction_id(self):
+        count = WalletTransaction.query.count() + 1
+        return f"WLT-{datetime.now().year}-{count:05d}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'transaction_id': self.transaction_id,
+            'user_id': self.user_id,
+            'type': self.type,
+            'amount': self.amount,
+            'balance_before': self.balance_before,
+            'balance_after': self.balance_after,
+            'description': self.description,
+            'reference_type': self.reference_type,
+            'reference_id': self.reference_id,
+            'created_at': iso_utc(self.created_at)
+        }
+
+
 def init_db(app):
     db.init_app(app)
     with app.app_context():

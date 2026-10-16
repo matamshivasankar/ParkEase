@@ -5,8 +5,9 @@ import uuid
 import json
 import base64
 import os
+import re
 
-from backend.models import db, Booking, User, Payment, Facility
+from backend.models import db, Booking, User, Payment, Facility, WalletRecharge, WalletTransaction
 from backend.middleware.auth_middleware import admin_required, get_current_user_id
 from backend.utils.helpers import utcnow, iso_utc, release_slots
 from backend.utils.notifier import create_notification, notify_admins
@@ -196,6 +197,12 @@ def upload_payment_screenshot():
 
     if not booking_id or not screenshot_base64:
         return jsonify({'error': 'booking_id and screenshot_base64 required'}), 400
+
+    if not transaction_id:
+        return jsonify({'error': 'Transaction ID is required'}), 400
+
+    if not re.match(r'^[0-9]{12}$', transaction_id):
+        return jsonify({'error': 'Transaction ID must contain exactly 12 digits.'}), 400
 
     booking = Booking.query.get(booking_id)
     if not booking:
@@ -658,3 +665,288 @@ def payment_webhook():
     emit_payment_update(booking.id, status, payment.to_dict())
 
     return jsonify({'message': 'Webhook processed', 'payment': payment.to_dict()}), 200
+
+
+# ============================================================
+# WALLET RECHARGE ROUTES
+# ============================================================
+
+@payment_bp.route('/wallet/recharge', methods=['POST'])
+@jwt_required()
+def create_wallet_recharge():
+    """User submits a wallet recharge request with screenshot and transaction ID."""
+    current_user_id = get_current_user_id()
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    amount = data.get('amount')
+    transaction_id = str(data.get('transaction_id') or '').strip()
+    screenshot_base64 = data.get('screenshot_base64')
+
+    if not amount or not transaction_id or not screenshot_base64:
+        return jsonify({'error': 'Amount, transaction ID, and screenshot are required'}), 400
+
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid amount'}), 400
+
+    if amount <= 0 or amount > 50000:
+        return jsonify({'error': 'Invalid amount (1-50000)'}), 400
+
+    # Validate transaction ID: exactly 12 digits
+    if not re.match(r'^[0-9]{12}$', transaction_id):
+        return jsonify({'error': 'Transaction ID must contain exactly 12 digits.'}), 400
+
+    # Check for duplicate transaction ID
+    existing = WalletRecharge.query.filter_by(transaction_id=transaction_id).first()
+    if existing:
+        return jsonify({'error': 'This transaction ID has already been used'}), 409
+
+    # Decode and validate screenshot
+    try:
+        encoded = screenshot_base64.split(',', 1)[1] if ',' in screenshot_base64 else screenshot_base64
+        screenshot_data = base64.b64decode(encoded, validate=True)
+    except Exception:
+        return jsonify({'error': 'Screenshot is not valid base64'}), 400
+
+    if not screenshot_data:
+        return jsonify({'error': 'Screenshot is empty'}), 400
+    if len(screenshot_data) > MAX_SCREENSHOT_BYTES:
+        return jsonify({'error': 'Screenshot exceeds 5MB limit'}), 400
+    if not screenshot_data.startswith(SCREENSHOT_MAGIC):
+        return jsonify({'error': 'Screenshot must be a PNG, JPEG or GIF image'}), 400
+
+    # Save screenshot
+    folder = current_app.config['SCREENSHOT_FOLDER']
+    try:
+        os.makedirs(folder, exist_ok=True)
+        extension = 'jpg' if screenshot_data.startswith(b'\xff\xd8\xff') else (
+            'gif' if screenshot_data.startswith((b'GIF87a', b'GIF89a')) else (
+                'webp' if screenshot_data.startswith(b'RIFF') else 'png'))
+        screenshot_filename = f"recharge_{user.user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extension}"
+        screenshot_path = os.path.join(folder, screenshot_filename)
+        with open(screenshot_path, 'wb') as f:
+            f.write(screenshot_data)
+    except Exception as e:
+        return jsonify({'error': f'Failed to save screenshot: {str(e)}'}), 500
+
+    # Create recharge request
+    recharge = WalletRecharge(
+        recharge_id=f"RCH-{datetime.now().year}-{WalletRecharge.query.count() + 1:05d}",
+        user_id=current_user_id,
+        amount=amount,
+        transaction_id=transaction_id,
+        screenshot_file=screenshot_filename,
+        status='pending_verification'
+    )
+    db.session.add(recharge)
+    db.session.commit()
+
+    # Notify admins
+    notify_admins(
+        ntype='wallet_recharge_verification',
+        title='Wallet recharge awaiting verification',
+        message=f"{user.full_name} submitted a wallet recharge of Rs.{amount:.2f} (TXN: {transaction_id}).",
+        link='admin'
+    )
+
+    return jsonify({
+        'message': 'Payment submitted successfully. Your wallet will be credited after admin verification.',
+        'recharge': recharge.to_dict()
+    }), 200
+
+
+@payment_bp.route('/wallet/recharge/history', methods=['GET'])
+@jwt_required()
+def get_wallet_recharge_history():
+    """Get user's wallet recharge request history."""
+    current_user_id = get_current_user_id()
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    recharges = WalletRecharge.query.filter_by(user_id=current_user_id).order_by(WalletRecharge.created_at.desc()).all()
+
+    return jsonify({
+        'recharges': [r.to_dict() for r in recharges]
+    }), 200
+
+
+@payment_bp.route('/wallet/transactions', methods=['GET'])
+@jwt_required()
+def get_wallet_transactions():
+    """Get user's wallet transaction history."""
+    current_user_id = get_current_user_id()
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    transactions = WalletTransaction.query.filter_by(user_id=current_user_id).order_by(WalletTransaction.created_at.desc()).all()
+
+    return jsonify({
+        'transactions': [t.to_dict() for t in transactions]
+    }), 200
+
+
+# ============================================================
+# ADMIN WALLET RECHARGE VERIFICATION ROUTES
+# ============================================================
+
+@payment_bp.route('/admin/wallet/recharges', methods=['GET'])
+@jwt_required()
+@admin_required
+def admin_get_wallet_recharges():
+    """Admin: Get all wallet recharge requests with filtering."""
+    status = request.args.get('status')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+
+    query = WalletRecharge.query.order_by(WalletRecharge.created_at.desc())
+
+    if status:
+        query = query.filter_by(status=status)
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'recharges': [r.to_dict() for r in pagination.items],
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': pagination.total,
+            'pages': pagination.pages
+        }
+    }), 200
+
+
+@payment_bp.route('/admin/wallet/recharge/<int:recharge_id>', methods=['POST'])
+@jwt_required()
+@admin_required
+def admin_verify_wallet_recharge(recharge_id):
+    """Admin approves or rejects a wallet recharge request."""
+    data = request.get_json() or {}
+    action = data.get('action')  # 'approve' or 'reject'
+    notes = str(data.get('notes') or '').strip()
+
+    admin_user = User.query.get(get_current_user_id())
+
+    recharge = WalletRecharge.query.get(recharge_id)
+    if not recharge:
+        return jsonify({'error': 'Recharge request not found'}), 404
+
+    if recharge.status != 'pending_verification':
+        return jsonify({
+            'error': f'Recharge is not awaiting verification (current status: {recharge.status})'
+        }), 409
+
+    if action not in ('approve', 'reject'):
+        return jsonify({'error': 'Invalid action. Use approve or reject'}), 400
+
+    # Prevent admin from approving their own recharge request
+    if admin_user and admin_user.id == recharge.user_id:
+        return jsonify({'error': 'You cannot approve/reject your own recharge request'}), 403
+
+    user = User.query.get(recharge.user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if action == 'approve':
+        # Check if already processed (idempotency)
+        if recharge.status == 'approved':
+            return jsonify({'error': 'This recharge has already been approved'}), 409
+
+        # Use database transaction for atomic wallet credit
+        try:
+            balance_before = user.wallet_balance
+            user.wallet_balance += recharge.amount
+            balance_after = user.wallet_balance
+
+            # Update recharge record
+            recharge.status = 'approved'
+            recharge.admin_id = admin_user.id if admin_user else None
+            recharge.admin_notes = notes
+            recharge.verified_at = utcnow()
+            recharge.updated_at = utcnow()
+
+            # Create wallet transaction record
+            wallet_txn = WalletTransaction(
+                transaction_id=f"WLT-{datetime.now().year}-{WalletTransaction.query.count() + 1:05d}",
+                user_id=user.id,
+                type='credit',
+                amount=recharge.amount,
+                balance_before=balance_before,
+                balance_after=balance_after,
+                description=f'Wallet recharge approved (TXN: {recharge.transaction_id})',
+                reference_type='recharge',
+                reference_id=recharge.id
+            )
+            db.session.add(wallet_txn)
+
+            db.session.commit()
+
+            # Notify user
+            create_notification(
+                user.id,
+                ntype='wallet_recharge_approved',
+                title='Wallet recharge approved',
+                message=f"Your wallet recharge of Rs.{recharge.amount:.2f} has been approved. New balance: Rs.{balance_after:.2f}",
+                link='dashboard'
+            )
+
+            message = 'Wallet recharge approved and amount credited'
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to process approval: {str(e)}'}), 500
+
+    else:  # reject
+        if not notes:
+            return jsonify({'error': 'Rejection reason is required'}), 400
+
+        recharge.status = 'rejected'
+        recharge.admin_id = admin_user.id if admin_user else None
+        recharge.rejected_reason = notes
+        recharge.updated_at = utcnow()
+        db.session.commit()
+
+        create_notification(
+            user.id,
+            ntype='wallet_recharge_rejected',
+            title='Wallet recharge rejected',
+            message=f"Your wallet recharge of Rs.{recharge.amount:.2f} was rejected: {notes}",
+            link='dashboard'
+        )
+
+        message = 'Wallet recharge rejected'
+
+    return jsonify({
+        'message': message,
+        'recharge': recharge.to_dict()
+    }), 200
+
+
+@payment_bp.route('/admin/wallet/stats', methods=['GET'])
+@jwt_required()
+@admin_required
+def admin_wallet_recharge_stats():
+    """Admin: Get wallet recharge statistics."""
+    from sqlalchemy import func
+
+    total_pending = WalletRecharge.query.filter_by(status='pending_verification').count()
+    total_approved = WalletRecharge.query.filter_by(status='approved').count()
+    total_rejected = WalletRecharge.query.filter_by(status='rejected').count()
+    total_amount_pending = db.session.query(func.sum(WalletRecharge.amount)).filter_by(status='pending_verification').scalar() or 0
+    total_amount_approved = db.session.query(func.sum(WalletRecharge.amount)).filter_by(status='approved').scalar() or 0
+
+    return jsonify({
+        'pending_count': total_pending,
+        'approved_count': total_approved,
+        'rejected_count': total_rejected,
+        'pending_amount': float(total_amount_pending),
+        'approved_amount': float(total_amount_approved)
+    }), 200

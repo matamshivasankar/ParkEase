@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 
-from backend.models import db, User, Vehicle, Booking
+from backend.models import db, User, Vehicle, Booking, Payment
 from backend.middleware.auth_middleware import get_current_user_id
 from backend.utils.lifecycle import complete_expired_bookings
 from backend.utils.validators import validate_vehicle
@@ -150,8 +150,40 @@ def get_user_bookings():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     bookings = pagination.items
 
+    def _payment_screenshot_file(payment):
+        """Filename of a payment's screenshot, or None."""
+        import json
+        if not payment.gateway_response:
+            return None
+        try:
+            gw = json.loads(payment.gateway_response)
+        except (TypeError, ValueError):
+            return None
+        name = gw.get('screenshot_file')
+        if not name:
+            legacy = gw.get('screenshot_path')
+            if legacy:
+                name = str(legacy).replace('\\', '/').split('/')[-1]
+        return name or None
+
+    def _booking_payment_info(booking):
+        """Get the latest payment info for a booking, including screenshot."""
+        payment = Payment.query.filter_by(booking_id=booking.id).order_by(Payment.created_at.desc()).first()
+        if not payment:
+            return {}
+        screenshot_file = _payment_screenshot_file(payment)
+        return {
+            'payment_id': payment.payment_id,
+            'payment_status': payment.status,
+            'transaction_id': payment.transaction_id,
+            'payment_method': payment.method,
+            'screenshot_file': screenshot_file,
+            'screenshot_url': f'/screenshots/{screenshot_file}' if screenshot_file else None,
+            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None
+        }
+
     return jsonify({
-        'bookings': [b.to_dict() for b in bookings],
+        'bookings': [b.to_dict() | _booking_payment_info(b) for b in bookings],
         'pagination': {
             'page': page,
             'per_page': per_page,

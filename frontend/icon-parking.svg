@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: solid dark navy-blue rounded square -->
+  <rect x="24" y="24" width="208" height="208" rx="32" fill="#243F78"/>
+  
+  <!-- White letter P - geometric and bold -->
+  <!-- Formed by: left vertical stroke + top crossbar + enclosed bowl -->
+  <path d="M72 160 L72 80 L96 80 Q120 120 152 160 Z" fill="#FFFFFF"/>
+  
+  <!-- Teal location pin inside the P's counter (negative space) -->
+  <!-- Positioned in the upper-middle portion of the P's bowl -->
+  <g transform="translate(144, 104)">
+    <!-- Pin body: teal inverted triangle pointing down, indicating location -->
+    <path d="M0 0 L0 24 L12 12 Z" fill="#39B8AD"/>
+    <!-- White circular center of the pin -->
+    <circle cx="0" cy="12" r="5" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- Parking-space symbol beneath the location pin -->
+  <!-- Two white-outline parking stalls with teal accent, centered below the pin -->
+  <g transform="translate(120, 172)">
+    <!-- Left parking stall: white outline with teal accent -->
+    <rect x="-28" y="-35" width="8" height="50" fill="none" stroke="#FFFFFF" stroke-width="6" rx="4"/>
+    <!-- Right parking stall -->
+    <rect x="20" y="-35" width="8" height="50" fill="none" stroke="#FFFFFF" stroke-width="6" rx="4"/>
+    <!-- Teal accent bars: small rectangles suggesting parking lines -->
+    <rect x="-16" y="-15" width="8" height="20" fill="#39B8AD"/>
+    <rect x="12" y="-15" width="8" height="20" fill="#39B8AD"/>
+  </g>
+</svg>

@@ -50,7 +50,7 @@
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-shimmer { animation: shimmer 1.5s infinite; }
 .animate-float { animation: float 3s var(--ease-in-out) infinite; }
-.animate-glow { animation: glow 2s var(--ease-in-out) infinite; }
+.animate-glow { animation: none; }
 
 /* ---------- Delay Classes ---------- */
 .delay-1 { animation-delay: 80ms; }
@@ -67,14 +67,14 @@
 .stagger-6 { animation-delay: 360ms; }
 
 /* ---------- Hover Effects ---------- */
-.hover-lift { transition: transform var(--duration-normal), box-shadow var(--duration-normal); }
-.hover-lift:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.hover-lift { transition: box-shadow var(--duration-normal), border-color var(--duration-normal); }
+.hover-lift:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border-strong); }
 
 .hover-scale { transition: transform var(--duration-fast); }
 .hover-scale:hover { transform: scale(1.02); }
 
 .hover-glow { transition: box-shadow var(--duration-normal); }
-.hover-glow:hover { box-shadow: 0 0 24px rgba(15, 76, 140, 0.3); }
+.hover-glow:hover { box-shadow: var(--shadow-sm); }
 
 /* ---------- Focus Ring ---------- */
 .focus-ring:focus { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--radius-sm); }

@@ -107,6 +107,7 @@ const API = (() => {
     ensureOk,
     handleError,
     fetchImage,
+    getCsrfToken,
     userStore
   };
 })();
@@ -122,7 +123,7 @@ const Auth = (() => {
   }
   function logout() {
     API.userStore.clear();
-    const csrf = getCsrfToken();
+    const csrf = API.getCsrfToken();
     const headers = { 'Content-Type': 'application/json' };
     if (csrf) headers['X-CSRF-TOKEN'] = csrf;
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include', headers }).catch(() => {});
@@ -139,3 +140,6 @@ const Auth = (() => {
     flagSessionExpired
   };
 })();
+
+window.Auth = Auth;
+window.API = API;

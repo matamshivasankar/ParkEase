@@ -2,6 +2,46 @@
    ParkEase Components - Shared UI Library
    ============================================================ */
 
+/* ---------- Brand Logo ---------- */
+.brand-logo {
+  flex-shrink: 0;
+  border-radius: 12px;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.navbar-brand .brand-text {
+  white-space: nowrap;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  margin-bottom: var(--space-4);
+}
+
+.auth-card-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-card-header .brand-logo {
+  margin: 0 auto var(--space-3);
+  border-radius: 16px;
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex;
@@ -9,12 +49,12 @@
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
-  font-size: var(--text-sm);
+  font-size: 0.875rem;
   font-weight: var(--font-weight-medium);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   white-space: nowrap;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
   min-height: var(--touch-target);
 }
 .btn:focus-visible { box-shadow: var(--shadow-focus); }
@@ -22,7 +62,7 @@
 
 /* Sizes */
 .btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--text-xs); min-height: var(--touch-target-sm); }
-.btn-lg { padding: var(--space-3) var(--space-7); font-size: var(--text-base); }
+.btn-lg { padding: 12px 20px; font-size: 0.875rem; }
 .btn-icon { padding: var(--space-2); width: var(--touch-target); height: var(--touch-target); }
 .btn-icon-sm { width: var(--touch-target-sm); height: var(--touch-target-sm); }
 
@@ -32,7 +72,7 @@
   color: var(--color-text-inverse);
   border-color: var(--color-brand);
 }
-.btn-primary:hover:not(:disabled) { background: var(--color-brand-hover); border-color: var(--color-brand-hover); box-shadow: var(--shadow-md); }
+.btn-primary:hover:not(:disabled) { background: var(--color-brand-hover); border-color: var(--color-brand-hover); }
 
 .btn-secondary {
   background: var(--color-bg-elevated);
@@ -63,11 +103,11 @@
 .btn-accent:hover:not(:disabled) { background: var(--color-brand-accent-hover); border-color: var(--color-brand-accent-hover); box-shadow: var(--shadow-md); }
 
 .btn-danger {
-  background: var(--color-brand-danger);
+  background: var(--color-danger);
   color: var(--color-text-inverse);
-  border-color: var(--color-brand-danger);
+  border-color: var(--color-danger);
 }
-.btn-danger:hover:not(:disabled) { background: var(--color-brand-danger-hover); border-color: var(--color-brand-danger-hover); box-shadow: var(--shadow-md); }
+.btn-danger:hover:not(:disabled) { background: var(--color-danger-hover); border-color: var(--color-danger-hover); box-shadow: var(--shadow-md); }
 
 .btn-success {
   background: var(--color-success);
@@ -101,9 +141,9 @@
 .form-input {
   width: 100%;
   padding: var(--space-2) var(--space-4);
-  font-size: var(--text-base);
+  font-size: 0.875rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
   color: var(--color-text);
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast), background var(--duration-fast);
@@ -195,13 +235,13 @@
 /* ---------- Cards ---------- */
 .card {
   background: var(--color-bg-elevated);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
   border: 1px solid var(--color-border);
   overflow: hidden;
   transition: box-shadow var(--duration-normal), border-color var(--duration-normal);
 }
-.card:hover { box-shadow: var(--shadow-md); border-color: var(--color-border-strong); }
+.card:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border-strong); }
 
 .card-header {
   padding: var(--space-4) var(--space-5);
@@ -295,8 +335,8 @@
   left: 50%;
   transform: translate(-50%, -50%) scale(0.96);
   background: var(--color-bg-elevated);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   max-width: 90vw;
   max-height: 85vh;
   overflow: auto;
@@ -480,7 +520,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-accent));
+  background: var(--color-brand);
   color: var(--color-text-inverse);
   font-weight: var(--font-weight-semibold);
   flex-shrink: 0;
@@ -549,8 +589,8 @@
   min-width: 200px;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: var(--space-2);
   z-index: var(--z-dropdown);
   opacity: 0;
@@ -599,7 +639,7 @@
 
 /* ---------- Progress ---------- */
 .progress-track { height: 6px; background: var(--color-neutral-200); border-radius: var(--radius-full); overflow: hidden; }
-.progress-fill { height: 100%; border-radius: var(--radius-full); background: linear-gradient(90deg, var(--color-brand), var(--color-brand-accent)); transition: width var(--duration-slow) var(--ease-out); }
+.progress-fill { height: 100%; border-radius: var(--radius-full); background: var(--color-brand-accent); transition: width var(--duration-slow) var(--ease-out); }
 
 /* ---------- Utility Classes ---------- */
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }

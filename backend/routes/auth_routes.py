@@ -16,7 +16,12 @@ from backend.utils.helpers import utcnow
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 @auth_bp.route('/register', methods=['POST'])
+@jwt_required(optional=True)  # Allow optional JWT, but don't require CSRF for registration
 def register():
+    # Disable CSRF for this endpoint since user doesn't have a session yet
+    if hasattr(request, 'csrf_protect'):
+        request.csrf_protect = False
+    
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -59,7 +64,12 @@ def register():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@jwt_required(optional=True)  # Allow optional JWT, but don't require CSRF for login
 def login():
+    # Disable CSRF for this endpoint since user doesn't have a session yet
+    if hasattr(request, 'csrf_protect'):
+        request.csrf_protect = False
+    
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -94,7 +104,6 @@ def login():
 
 
 @auth_bp.route('/logout', methods=['POST'])
-@jwt_required()
 def logout():
     response = jsonify({'message': 'Logged out successfully'})
     unset_jwt_cookies(response)

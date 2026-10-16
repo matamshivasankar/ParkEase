@@ -327,7 +327,7 @@
         adminTab('verifications');
         loadAdminVerifications();
       } else if (link === 'dashboard') {
-        navigate('dashboard');
+        navigate('home');
         tab('bookings');
       }
     }
@@ -704,6 +704,9 @@
     const d = $('#booking-date');
     d.min = H.localDate(today);
     d.value = H.localDate(today);
+    const endDate = $('#booking-end-date');
+    endDate.min = H.localDate(today);
+    endDate.value = H.localDate(today);
     $('#booking-start').value = '10:00';
     $('#booking-end').value = '12:00';
     $('#booking-slot-count').value = '1';
@@ -793,6 +796,19 @@
     return $$('[data-vehicle-input]').map(i => i.value.trim().toUpperCase());
   }
 
+  /* Indian vehicle number regex: state code (2 letters) + district code (2 digits) + series (1-2 letters) + number (1-4 digits) */
+  const INDIAN_VEHICLE_REGEX = /^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{1,4}$/;
+
+  function validateVehicleNumber(v) {
+    if (!v) return false;
+    const clean = v.trim().toUpperCase().replace(/\s+/g, '');
+    return INDIAN_VEHICLE_REGEX.test(clean);
+  }
+
+  function formatVehicleNumber(v) {
+    return v.trim().toUpperCase().replace(/\s+/g, '');
+  }
+
   /* Enforces the 1:1 slot/vehicle rule in the UI so the user sees the problem
      before submitting, and disables the CTA until it is satisfied. */
   function validateVehicles() {
@@ -812,7 +828,11 @@
     if (dupes.length) {
       return { ok: false, reason: `Duplicate vehicle number: ${dupes[0]}. Each slot needs a different vehicle.`, missing: 0 };
     }
-    return { ok: true, vehicles: nums, missing: 0 };
+    const invalid = nums.filter(v => !validateVehicleNumber(v));
+    if (invalid.length) {
+      return { ok: false, reason: `Invalid vehicle number format: ${invalid[0]}. Use format like AP40MH5982, TS09AB1234, KA03MN4567.`, missing: 0 };
+    }
+    return { ok: true, vehicles: nums.map(formatVehicleNumber), missing: 0 };
   }
 
   function updateVehicleValidity() {
@@ -840,11 +860,82 @@
 
   function getDuration() {
     const start = new Date($('#booking-date').value + 'T' + $('#booking-start').value);
-    const end = new Date($('#booking-date').value + 'T' + $('#booking-end').value);
+    const end = new Date($('#booking-end-date').value + 'T' + $('#booking-end').value);
     if (isNaN(start) || isNaN(end) || end <= start) return null;
     const hours = Math.round((end - start) / 3600000);
     if (hours < 1) return null;
-    return { start, end, duration_value: hours, duration_unit: 'hours' };
+    
+    // Check if duration is 30 days or more (720 hours)
+    const isMonthly = hours >= 720;
+    const monthlyValue = Math.round(hours / 720); // Number of months
+    
+    return { 
+      start, 
+      end, 
+      duration_value: isMonthly ? monthlyValue : hours, 
+      duration_unit: isMonthly ? 'monthly' : 'hours',
+      raw_hours: hours,
+      is_monthly_eligible: isMonthly
+    };
+  }
+  
+  function getSelectedDurationMode() {
+    const monthlyOption = $('#monthly-pass-option input[name="monthly-pass"]:checked');
+    return monthlyOption ? monthlyOption.value : 'regular';
+  }
+  
+  function updateMonthlyPassVisibility() {
+    const dur = getDuration();
+    const container = $('#monthly-pass-option');
+    if (!container) return;
+    
+    if (dur && dur.is_monthly_eligible) {
+      container.style.display = 'block';
+      // Update price displays
+      updateMonthlyPassPrices(dur);
+    } else {
+      container.style.display = 'none';
+    }
+  }
+  
+  async function updateMonthlyPassPrices(dur) {
+    const f = state.facility;
+    if (!f || !state.selectedSlots.length) return;
+    
+    const vehicleType = $('#booking-vehicle-type').value;
+    const slotCount = state.selectedSlots.length;
+    
+    // Calculate regular price (hourly)
+    try {
+      const regularRes = await API.post('/bookings/price-estimate', {
+        facility_id: f.id,
+        vehicle_type: vehicleType,
+        duration_value: dur.raw_hours,
+        duration_unit: 'hours',
+        start_time: dur.start.toISOString(),
+        slot_count: slotCount
+      });
+      const regularPrice = API.ensureOk(regularRes).price_breakdown;
+      $('#regular-pass-price').textContent = H.inr(regularPrice.total_amount);
+    } catch (e) {
+      $('#regular-pass-price').textContent = '—';
+    }
+    
+    // Calculate monthly price
+    try {
+      const monthlyRes = await API.post('/bookings/price-estimate', {
+        facility_id: f.id,
+        vehicle_type: vehicleType,
+        duration_value: dur.duration_value,
+        duration_unit: 'monthly',
+        start_time: dur.start.toISOString(),
+        slot_count: slotCount
+      });
+      const monthlyPrice = API.ensureOk(monthlyRes).price_breakdown;
+      $('#monthly-pass-price').textContent = H.inr(monthlyPrice.total_amount);
+    } catch (e) {
+      $('#monthly-pass-price').textContent = '—';
+    }
   }
 
   function renderSlotGrid() {
@@ -901,8 +992,30 @@
       if (cta) cta.disabled = true;
       return;
     }
+    
+    // Update monthly pass visibility and prices
+    updateMonthlyPassVisibility();
+    
+    // Determine which duration mode to use
+    const mode = getSelectedDurationMode();
+    let durationValue = dur.duration_value;
+    let durationUnit = dur.duration_unit;
+    let displayDuration = `${dur.duration_value} hour${dur.duration_value > 1 ? 's' : ''}`;
+    
+    if (dur.is_monthly_eligible) {
+      if (mode === 'monthly') {
+        durationValue = dur.duration_value;
+        durationUnit = 'monthly';
+        displayDuration = `${dur.duration_value} month${dur.duration_value > 1 ? 's' : ''} (Monthly Pass)`;
+      } else {
+        durationValue = dur.raw_hours;
+        durationUnit = 'hours';
+        displayDuration = `${dur.raw_hours} hour${dur.raw_hours > 1 ? 's' : ''} (Regular)`;
+      }
+    }
+    
+    $('#sum-duration').textContent = displayDuration;
     $('#sum-facility').textContent = f.name;
-    $('#sum-duration').textContent = `${dur.duration_value} hour${dur.duration_value > 1 ? 's' : ''}`;
 
     if (!state.selectedSlots.length) {
       if (cta) cta.disabled = true;
@@ -914,8 +1027,8 @@
       const res = await API.post('/bookings/price-estimate', {
         facility_id: f.id,
         vehicle_type: $('#booking-vehicle-type').value,
-        duration_value: dur.duration_value,
-        duration_unit: dur.duration_unit,
+        duration_value: durationValue,
+        duration_unit: durationUnit,
         start_time: dur.start.toISOString(),
         slot_count: state.selectedSlots.length
       });
@@ -926,7 +1039,7 @@
         $('#sum-discount').textContent = '-' + H.inr(p.discount);
         $('#sum-discount-label').textContent = 'Discount' + (p.discount_reason ? '' : '');
       } else {
-        $('#sum-discount').textContent = '\\u2013';
+        $('#sum-discount').textContent = '\u2013';
       }
       $('#sum-gst').textContent = H.inr(p.gst);
       $('#sum-total').textContent = H.inr(p.total_amount);
@@ -948,9 +1061,9 @@
     });
   }
 
-  /* ============================================================
+/* ============================================================
      BOOKING
-  ============================================================ */
+   ============================================================ */
   function openBookingModal() {
     const f = state.facility;
     if (!f) return;
@@ -965,6 +1078,22 @@
     if (!state.price) { Toast.error('Could not compute price. Try again.'); return; }
 
     const vehicleNos = vehicleCheck.vehicles;
+    
+    // Use selected duration mode
+    const mode = getSelectedDurationMode();
+    let durationValue = dur.duration_value;
+    let durationUnit = dur.duration_unit;
+    
+    if (dur.is_monthly_eligible) {
+      if (mode === 'monthly') {
+        durationValue = dur.duration_value;
+        durationUnit = 'monthly';
+      } else {
+        durationValue = dur.raw_hours;
+        durationUnit = 'hours';
+      }
+    }
+    
     state.draft = {
       facility_id: f.id,
       vehicle_nos: vehicleNos,
@@ -972,16 +1101,16 @@
       vehicle_type: $('#booking-vehicle-type').value,
       start_time: dur.start.toISOString(),
       end_time: dur.end.toISOString(),
-      duration_value: dur.duration_value,
-      duration_unit: dur.duration_unit,
+      duration_value: durationValue,
+      duration_unit: durationUnit,
       slot_codes: state.selectedSlots.slice()
     };
     const p = state.price;
     const box = $('#booking-modal-content');
     box.innerHTML = `
-      <div class="alert alert-info demo-banner" style="margin-bottom:var(--spacing-md);background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)">
-        <span>${I.shield}</span>
-        <strong>Demo Mode:</strong> Booking will be created but payment is simulated. No real money is charged.
+      <div class="alert alert-info" style="margin-bottom:var(--spacing-md);display:flex;align-items:center;gap:var(--spacing-sm)">
+        <span>${I.info}</span>
+        <strong>Payment Required:</strong> Complete payment to confirm your booking. Your slot will be held for 10 minutes.
       </div>
       <div class="summary-item"><span class="label">Facility</span><span class="value">${H.esc(f.name)}</span></div>
       <div class="summary-item"><span class="label">Slots</span><span class="value">${state.selectedSlots.map(s => `<span class="badge badge-info" style="margin:2px">${H.esc(s)}</span>`).join(' ')}</span></div>
@@ -1182,7 +1311,7 @@
 
       if (method === 'wallet') {
         qrContainer.style.display = 'none';
-        st.innerHTML = '<div class="alert alert-info mt-2 demo-banner" style="background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)"><span>${I.shield}</span><strong>Demo Mode:</strong> Wallet payment is simulated. No real money is deducted.</div>';
+        st.innerHTML = '<div class="alert alert-info mt-2" style="display:flex;align-items:center;gap:var(--spacing-sm)"><span>${I.wallet}</span><strong>Wallet Payment:</strong> Amount will be deducted from your wallet balance.</div>';
       } else {
         qrContainer.style.display = 'block';
         st.innerHTML = '';
@@ -1218,9 +1347,9 @@
     const duration = durationLabel(booking.duration_value, booking.duration_unit);
 
     container.innerHTML = `
-      <div class="alert alert-info demo-banner" style="margin-bottom:var(--spacing-md);background:rgba(74,144,217,0.1);border-color:var(--color-secondary);color:var(--color-secondary);display:flex;align-items:center;gap:var(--spacing-sm)">
-        <span>${I.shield}</span>
-        <strong>Demo Mode:</strong> Payment is simulated. No real money is charged. Use any UPI ID and upload a test screenshot for admin verification.
+      <div class="alert alert-info" style="margin-bottom:var(--spacing-md);display:flex;align-items:center;gap:var(--spacing-sm)">
+        <span>${I.info}</span>
+        <strong>UPI Payment:</strong> Scan the QR code to pay. After payment, upload the screenshot and enter the 12-digit Transaction ID/UTR for admin verification.
       </div>
       <div class="upi-card">
         <div class="upi-card-head">
@@ -1281,9 +1410,11 @@
             </div>
 
             <div class="upi-field">
-              <label class="form-label" for="upi-txn-id">Transaction ID</label>
+              <label class="form-label" for="upi-txn-id">Transaction ID / UTR <span class="text-muted" style="font-weight:normal">(12 digits)</span></label>
               <input type="text" id="upi-txn-id" class="form-input" inputmode="numeric" autocomplete="off"
-                     placeholder="Enter UPI Transaction ID (e.g. 1234567890)">
+                     maxlength="12" minlength="12" pattern="[0-9]{12}"
+                     placeholder="Enter 12-digit UPI Transaction ID / UTR">
+              <span class="form-error" id="upi-txn-error" style="display:none">Transaction ID must contain exactly 12 digits.</span>
             </div>
 
             <div class="upi-field">
@@ -1382,10 +1513,31 @@
       if (e.target.files[0]) accept(e.target.files[0]);
     });
 
+    const txnInput = $('#upi-txn-id');
+    const txnError = $('#upi-txn-error');
+    if (txnInput) {
+      txnInput.addEventListener('input', () => {
+        txnInput.value = txnInput.value.replace(/[^0-9]/g, '').slice(0, 12);
+        const valid = /^[0-9]{12}$/.test(txnInput.value);
+        if (txnError) txnError.style.display = (!valid && txnInput.value.length > 0) ? 'block' : 'none';
+        txnInput.classList.toggle('error', !valid && txnInput.value.length > 0);
+      });
+      txnInput.addEventListener('blur', () => {
+        const valid = /^[0-9]{12}$/.test(txnInput.value);
+        if (txnError) txnError.style.display = (!valid && txnInput.value.length > 0) ? 'block' : 'none';
+      });
+    }
+
     submitBtn.addEventListener('click', async () => {
       const transactionId = $('#upi-txn-id').value.trim();
       if (!state.screenshotBase64) {
         Toast.error('Please upload your payment screenshot');
+        return;
+      }
+      if (!/^[0-9]{12}$/.test(transactionId)) {
+        Toast.error('Transaction ID must contain exactly 12 digits.');
+        $('#upi-txn-id').focus();
+        if (txnError) txnError.style.display = 'block';
         return;
       }
       submitBtn.disabled = true;
@@ -1429,10 +1581,10 @@
     const check = $('#pending-check-btn');
     if (check) check.addEventListener('click', () => checkPaymentStatus(booking.id, true));
     const done = $('#pending-done-btn');
-    if (done) done.addEventListener('click', () => {
-      Modal.closeAll();
-      if (Auth.isLoggedIn()) navigate('dashboard');
-    });
+      if (done) done.addEventListener('click', () => {
+        Modal.closeAll();
+        if (Auth.isLoggedIn()) navigate('home');
+      });
     startPaymentPolling(booking.id);
   }
 
@@ -1528,7 +1680,7 @@
     const dl = $('[data-dl-receipt]');
     if (dl) dl.addEventListener('click', () => { window.open('/api/bookings/' + booking.id + '/receipt', '_blank'); });
     const gd = $('[data-go-dash]');
-    if (gd) gd.addEventListener('click', () => { Modal.close('success-modal'); if (Auth.isLoggedIn()) navigate('dashboard'); else navigate('home'); });
+      if (gd) gd.addEventListener('click', () => { Modal.close('success-modal'); if (Auth.isLoggedIn()) navigate('home'); else navigate('home'); });
   }
 
   /* ============================================================
@@ -1578,52 +1730,101 @@
         if (b) b.addEventListener('click', () => navigate('facilities'));
         return;
       }
-      box.innerHTML = list.map(b => `
-        <div class="card mb-2">
+      box.innerHTML = list.map(b => {
+        const vehicles = (b.vehicles && b.vehicles.length) ? b.vehicles : [b.vehicle_no];
+        const screenshotUrl = b.screenshot_url;
+        const paymentStatus = b.payment_status || b.payment_status;
+        const transactionId = b.transaction_id;
+        const paymentMethod = b.payment_method;
+        const paidAt = b.paid_at;
+        
+        let paymentInfoHtml = '';
+        if (screenshotUrl) {
+          paymentInfoHtml = `
+            <div class="booking-payment-screenshot">
+              <img src="${screenshotUrl}" alt="Payment screenshot" class="payment-thumb" loading="lazy">
+              <span class="thumb-caption">Payment screenshot</span>
+            </div>`;
+        } else if (paymentStatus === 'pending_verification' || paymentStatus === 'pending_screenshot') {
+          paymentInfoHtml = `
+            <div class="booking-payment-screenshot">
+              <span class="thumb-placeholder">Payment screenshot not uploaded</span>
+            </div>`;
+        }
+        
+        let paymentStatusBadge = '';
+        if (paymentStatus) {
+          const statusMap = {
+            'pending_verification': 'badge-warning',
+            'pending_screenshot': 'badge-warning',
+            'approved': 'badge-success',
+            'paid': 'badge-success',
+            'rejected': 'badge-danger',
+            'failed': 'badge-danger',
+            'pending': 'badge-warning'
+          };
+          paymentStatusBadge = `<span class="badge ${statusMap[paymentStatus] || 'badge-neutral'}">${H.esc(paymentStatus)}</span>`;
+        }
+        
+        let actionButtons = '';
+        if (paymentStatus === 'pending_verification' || paymentStatus === 'pending_screenshot') {
+          actionButtons += `<button class="btn btn-sm btn-primary" data-repay="${b.id}">View payment</button>`;
+        }
+        if (paymentStatus === 'paid' && ['reserved', 'confirmed'].includes(b.status)) {
+          actionButtons += `<button class="btn btn-sm btn-outline" data-checkin="${b.id}">Check in</button>`;
+        }
+        if (b.status === 'active') {
+          actionButtons += `<button class="btn btn-sm btn-primary" data-checkout="${b.id}">Check out</button>`;
+        }
+        if (['reserved', 'confirmed', 'active'].includes(b.status)) {
+          actionButtons += `<button class="btn btn-sm btn-danger" data-cancel="${b.id}">Cancel</button>`;
+        }
+        if (b.check_in_time) {
+          actionButtons += `<a class="btn btn-sm btn-secondary" href="/api/bookings/${b.id}/receipt" target="_blank">Receipt</a>`;
+        }
+        
+        return `
+        <div class="card mb-2 booking-card">
           <div class="card-body">
-            <div class="flex-between mb-1" style="align-items:flex-start">
+            <div class="booking-header flex-between mb-1" style="align-items:flex-start">
               <div>
                 <div class="confirm-code" style="font-size:1.0625rem">${H.esc(b.booking_id)}</div>
                 <div class="text-muted" style="font-size:.8125rem">Booked ${H.fmtDT(b.created_at)}</div>
               </div>
               <span class="badge ${H.badge(b.status)}">${H.esc(b.status)}</span>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-md);margin:var(--spacing-sm) 0;font-size:.9375rem">
-              <span>${((b.vehicles && b.vehicles.length) ? b.vehicles : [b.vehicle_no])
-                .map(v => `<strong>${H.esc(v)}</strong>`).join(' &middot; ')} &middot; ${H.esc(b.vehicle_type)}</span>
+            <div class="booking-details" style="display:flex;flex-wrap:wrap;gap:var(--spacing-md);margin:var(--spacing-sm) 0;font-size:.9375rem">
+              <span>${vehicles.map(v => `<strong>${H.esc(v)}</strong>`).join(' &middot; ')} &middot; ${H.esc(b.vehicle_type)}</span>
               <span class="text-muted">${H.fmtDT(b.start_time)} &rarr; ${H.fmtDT(b.end_time)}</span>
             </div>
-            ${b.payment_status === 'pending_verification' ? `
-              <div class="alert alert-warning" style="margin:var(--spacing-sm) 0;font-size:.8125rem">
-                ${I.shield} Payment screenshot submitted and awaiting admin verification.
-                <button class="btn btn-sm btn-outline" data-recheck="${b.id}">Check status</button>
-              </div>` : ''}
-            <div class="flex-between" style="align-items:center">
+            ${paymentInfoHtml}
+            <div class="booking-footer flex-between" style="align-items:center; margin-top:var(--spacing-sm); padding-top:var(--spacing-sm); border-top:1px solid var(--color-border);">
               <span style="font-weight:700;color:var(--color-primary)">${H.inr(b.total_amount)}</span>
-              <span class="table-actions">
-                <span class="badge ${H.badge(b.payment_status)}">${H.esc(b.payment_status)}</span>
-                ${b.payment_status === 'pending_verification' ? `<button class="btn btn-sm btn-primary" data-repay="${b.id}">View payment</button>` : ''}
-                ${b.payment_status === 'paid' && ['reserved', 'confirmed'].includes(b.status) ? `<button class="btn btn-sm btn-outline" data-checkin="${b.id}">Check in</button>` : ''}
-                ${b.status === 'active' ? `<button class="btn btn-sm btn-primary" data-checkout="${b.id}">Check out</button>` : ''}
-                ${['reserved', 'confirmed', 'active'].includes(b.status) ? `<button class="btn btn-sm btn-danger" data-cancel="${b.id}">Cancel</button>` : ''}
-                ${b.check_in_time ? `<a class="btn btn-sm btn-secondary" href="/api/bookings/${b.id}/receipt" target="_blank">Receipt</a>` : ''}
-              </span>
+              <div class="booking-actions" style="display:flex;gap:var(--spacing-sm);align-items:center;flex-wrap:wrap;">
+                ${paymentStatusBadge}
+                ${actionButtons}
+              </div>
             </div>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
 
       $$('[data-checkin]', box).forEach(b => b.addEventListener('click', () => checkIn(Number(b.dataset.checkin))));
       $$('[data-checkout]', box).forEach(b => b.addEventListener('click', () => checkOut(Number(b.dataset.checkout))));
       $$('[data-cancel]', box).forEach(b => b.addEventListener('click', () => cancelBooking(Number(b.dataset.cancel))));
-      $$('[data-recheck]', box).forEach(b => b.addEventListener('click', () => checkPaymentStatus(Number(b.dataset.recheck), true)));
-      // Re-open the payment modal so a user can see the pending state or retry
-      // if their earlier upload was never received.
       $$('[data-repay]', box).forEach(b => b.addEventListener('click', () => {
         const booking = list.find(x => String(x.id) === b.dataset.repay);
         if (booking) openPayment(booking);
       }));
 
       scheduleLifecycleRefresh(list);
+      
+      // Make payment thumbnails clickable to view full size
+      $$('.payment-thumb', box).forEach(thumb => {
+        thumb.addEventListener('click', () => {
+          window.open(thumb.src, '_blank');
+        });
+      });
     } catch (e) {
       box.innerHTML = '<div class="empty-state"><p>Could not load your bookings.</p></div>';
     }
@@ -1767,12 +1968,14 @@
     if (!box) return;
     box.innerHTML = '<div class="loading-state"><span class="loading" aria-label="Loading"></span></div>';
     try {
-      const [hist, wall] = await Promise.all([
+      const [hist, wall, recharges] = await Promise.all([
         API.get('/payments/history'),
-        API.get('/payments/wallet')
+        API.get('/payments/wallet'),
+        API.get('/payments/wallet/recharge/history')
       ]);
       const list = API.ensureOk(hist).payments || [];
       const balance = API.ensureOk(wall).wallet_balance || 0;
+      const rechargeList = API.ensureOk(recharges).recharges || [];
       let html = `
         <div class="card mb-3">
           <div class="card-body flex-between" style="align-items:center">
@@ -1783,45 +1986,382 @@
             <button class="btn btn-accent" data-wallet-topup>+ Add Money</button>
           </div>
         </div>`;
+      
+      // Wallet Recharge History
+      html += `
+        <div class="card mb-3">
+          <div class="card-header flex-between">
+            <h3 style="font-size:1.0625rem">Wallet Recharge Requests</h3>
+            <button class="btn btn-primary btn-sm" data-wallet-recharge>+ Recharge Wallet</button>
+          </div>
+          <div class="card-body">
+            ${rechargeList.length === 0 ? `
+              <div class="empty-state" style="padding:var(--space-4)">
+                <div class="empty-state-icon">${I.wallet}</div>
+                <h3>No recharge requests</h3>
+                <p>Your wallet recharge history will appear here.</p>
+              </div>
+            ` : `
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr><th>Request ID</th><th>Amount</th><th>Transaction ID</th><th>Status</th><th>Date</th><th>Action</th></tr>
+                  </thead>
+                  <tbody>
+                    ${rechargeList.map(r => `
+                      <tr>
+                        <td><strong>${H.esc(r.recharge_id)}</strong></td>
+                        <td>${H.inr(r.amount)}</td>
+                        <td><code>${H.esc(r.transaction_id)}</code></td>
+                        <td><span class="badge ${walletRechargeBadge(r.status)}">${H.esc(formatRechargeStatus(r.status))}</span></td>
+                        <td>${H.fmtDT(r.created_at)}</td>
+                        <td>
+                          ${r.status === 'pending_verification' ? `
+                            <button class="btn btn-sm btn-outline" data-recharge-view="${r.id}">${I.eye} View</button>
+                          ` : ''}
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        </div>`;
+      
       if (!list.length) {
         html += `<div class="card"><div class="empty-state"><div class="empty-state-icon">${I.wallet}</div><h3>No transactions yet</h3><p>Your payment history will appear here.</p></div></div>`;
       } else {
-        html += `<div class="table-responsive"><table class="data-table">
-          <thead><tr><th>Booking</th><th>Transaction</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
-          <tbody>` + list.map(p => `
-            <tr>
-              <td>${H.esc(p.booking_id)}</td>
-              <td>${H.esc(p.transaction_id || '-')}</td>
-              <td>${H.inr(p.amount)}</td>
-              <td>${H.esc(p.method || '-')}</td>
-              <td><span class="badge ${H.badge(p.status)}">${H.esc(p.status)}</span></td>
-              <td>${H.fmtDT(p.paid_at)}</td>
-            </tr>`).join('') + `</tbody></table></div>`;
+        html += `<div class="card">
+          <div class="card-header">
+            <h3 style="font-size:1.0625rem">Payment History</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead><tr><th>Booking</th><th>Transaction</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody>` + list.map(p => `
+                <tr>
+                  <td>${H.esc(p.booking_id)}</td>
+                  <td>${H.esc(p.transaction_id || '-')}</td>
+                  <td>${H.inr(p.amount)}</td>
+                  <td>${H.esc(p.method || '-')}</td>
+                  <td><span class="badge ${H.badge(p.status)}">${H.esc(p.status)}</span></td>
+                  <td>${H.fmtDT(p.paid_at)}</td>
+                </tr>`).join('') + `</tbody></table>
+          </div>
+        </div>`;
       }
       box.innerHTML = html;
       const tp = $('[data-wallet-topup]', box);
-      if (tp) tp.addEventListener('click', () => addMoney(balance));
+      if (tp) tp.addEventListener('click', () => openWalletRechargeModal());
+      $$('[data-wallet-recharge]', box).forEach(b => b.addEventListener('click', () => openWalletRechargeModal()));
+      $$('[data-recharge-view]', box).forEach(b => b.addEventListener('click', () => openRechargeDetailModal(b.dataset.rechargeView)));
     } catch (e) {
       box.innerHTML = '<div class="empty-state"><p>Could not load payments.</p></div>';
     }
   }
 
-  function addMoney(balance) {
-    const amt = prompt('Enter amount to add to wallet (max \u20B950,000):');
-    if (!amt) return;
-    const n = Number(amt);
-    if (isNaN(n) || n <= 0 || n > 50000) { Toast.error('Invalid amount (1-50000).'); return; }
-    (async () => {
+  function walletRechargeBadge(status) {
+    const map = {
+      'pending_verification': 'badge-warning',
+      'approved': 'badge-success',
+      'rejected': 'badge-danger'
+    };
+    return map[status] || 'badge-neutral';
+  }
+
+  function formatRechargeStatus(status) {
+    const map = {
+      'pending_verification': 'Pending Verification',
+      'approved': 'Approved',
+      'rejected': 'Rejected'
+    };
+    return map[status] || status;
+  }
+
+  // Wallet Recharge Modal
+  let rechargeModalState = { screenshotBase64: null, selectedFile: null };
+
+  function openWalletRechargeModal() {
+    Modal.closeAll();
+    const box = $('#success-modal-body');
+    box.innerHTML = `
+      <div class="modal-head-simple">
+        <h3>Recharge Wallet</h3>
+        <p class="text-muted">Add money to your wallet using UPI. Upload payment screenshot and enter transaction ID after payment.</p>
+      </div>
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header">
+          <h3 style="font-size:1.0625rem">UPI Payment Details</h3>
+        </div>
+        <div class="card-body">
+          <div class="upi-qr-wrap" style="text-align:center;margin-bottom:var(--space-4)">
+            <img id="wallet-upi-qr" src="" alt="UPI QR Code" style="max-width:240px;height:auto;border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3);background:var(--color-bg-elevated)">
+            <div class="upi-qr-id" id="wallet-upi-id" style="margin-top:var(--space-2)"></div>
+            <button type="button" class="upi-copy" id="wallet-upi-copy" style="display:inline-flex;align-items:center;gap:var(--space-1);margin-top:var(--space-3);background:none;border:none;color:var(--color-brand-accent);font-size:var(--text-xs);font-weight:var(--font-weight-medium);cursor:pointer">
+              ${I.copy} Copy UPI ID
+            </button>
+          </div>
+          <div class="alert alert-info" style="font-size:var(--text-sm);background:var(--color-brand-light);border-color:var(--color-brand);color:var(--color-brand)">
+            <strong>UPI ID:</strong> <span id="wallet-upi-display"></span><br>
+            <strong>Amount:</strong> <span id="wallet-amount-display">Enter amount first</span><br>
+            <strong>Note:</strong> After payment, upload screenshot and enter Transaction ID/UTR below.
+          </div>
+        </div>
+      </div>
+      <form id="wallet-recharge-form" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="recharge-amount">Amount to Add (₹)</label>
+            <input type="number" id="recharge-amount" class="form-input" placeholder="e.g. 500" min="1" max="50000" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="recharge-txn-id">UPI Transaction ID / UTR <span class="text-muted" style="font-weight:normal">(12 digits)</span></label>
+          <input type="text" id="recharge-txn-id" class="form-input" placeholder="Enter 12-digit Transaction ID / UTR" maxlength="12" minlength="12" pattern="[0-9]{12}" inputmode="numeric" required>
+          <span class="form-error" id="recharge-txn-error" style="display:none">Transaction ID must contain exactly 12 digits.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="recharge-screenshot">Payment Screenshot</label>
+          <div class="upi-drop" id="recharge-drop" role="button" tabindex="0">
+            <span class="upi-drop-icon">${I.cloudUpload}</span>
+            <div class="upi-drop-title">Click to upload screenshot</div>
+            <div class="upi-drop-hint">PNG, JPG, or JPEG (Max 5MB)</div>
+            <input type="file" id="recharge-file" accept="image/png,image/jpeg" hidden>
+          </div>
+          <div id="recharge-preview" style="display:none;margin-top:var(--space-2)"></div>
+        </div>
+        <div class="modal-footer" style="margin-top:var(--space-4);border-top:1px solid var(--color-border);padding-top:var(--space-4);display:flex;gap:var(--space-3);justify-content:flex-end">
+          <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="recharge-submit-btn">${I.check} Submit for Verification</button>
+        </div>
+      </form>`;
+
+    Modal.open('success-modal');
+
+    // Load UPI QR
+    loadWalletUpiQr();
+
+    // Bind drop zone
+    bindRechargeDrop();
+
+    // Form submit
+    $('#wallet-recharge-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await submitWalletRecharge();
+    });
+  }
+
+  function loadWalletUpiQr() {
+    const merchantUpi = '6305898891@upi'; // Should match backend
+    const merchantName = 'ParkEase';
+    const amountEl = $('#recharge-amount');
+    const qrEl = $('#wallet-upi-qr');
+    const upiIdEl = $('#wallet-upi-display');
+    const upiCopyEl = $('#wallet-upi-copy');
+    const amountDisplay = $('#wallet-amount-display');
+
+    upiIdEl.textContent = merchantUpi;
+    upiCopyEl.addEventListener('click', async () => {
       try {
-        const res = await API.post('/payments/wallet/add', { amount: n });
-        const data = API.ensureOk(res);
-        Toast.success('Wallet topped up. New balance: ' + H.inr(data.wallet_balance));
-        loadPayments();
+        await navigator.clipboard.writeText(merchantUpi);
+        Toast.success('UPI ID copied!');
       } catch (e) {
-        const info = API.handleError({ status: e && e.status, data: e && e.data });
-        Toast.error(info.message);
+        Toast.error('Could not copy. Please note the UPI ID manually.');
       }
-    })();
+    });
+
+    amountEl.addEventListener('input', () => {
+      const amt = amountEl.value;
+      if (amt && amt > 0) {
+        const upiUrl = `upi://pay?pa=${merchantUpi}&pn=${merchantName}&am=${amt}&cu=INR&tn=Wallet%20Recharge&tr=RCH-${Date.now()}`;
+        qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiUrl)}`;
+        amountDisplay.textContent = `₹${Number(amt).toLocaleString('en-IN')}`;
+      } else {
+        qrEl.src = '';
+        amountDisplay.textContent = 'Enter amount first';
+      }
+    });
+  }
+
+  function validateTransactionId(input) {
+    const value = input.value;
+    const errorEl = $('#recharge-txn-error');
+    const isValid = /^[0-9]{12}$/.test(value);
+    input.classList.toggle('error', !isValid && value.length > 0);
+    if (errorEl) errorEl.style.display = (!isValid && value.length > 0) ? 'block' : 'none';
+    return isValid;
+  }
+
+  function checkFormValidity() {
+    const amount = $('#recharge-amount').value.trim();
+    const transactionId = $('#recharge-txn-id').value.trim();
+    const screenshot = rechargeModalState.screenshotBase64;
+    const submitBtn = $('#recharge-submit-btn');
+    const txnValid = /^[0-9]{12}$/.test(transactionId);
+    submitBtn.disabled = !(amount && txnValid && screenshot);
+  }
+
+  function bindRechargeDrop() {
+    const drop = $('#recharge-drop');
+    const fileInput = $('#recharge-file');
+    const preview = $('#recharge-preview');
+    const submitBtn = $('#recharge-submit-btn');
+    const txnInput = $('#recharge-txn-id');
+    const amountInput = $('#recharge-amount');
+
+    const accept = (file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        Toast.error('File too large. Max 5MB.');
+        return;
+      }
+      if (!file.type.match(/^image\/(png|jpeg|gif)$/)) {
+        Toast.error('Invalid file type. Use PNG, JPG, or GIF.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        rechargeModalState.screenshotBase64 = e.target.result;
+        rechargeModalState.selectedFile = file;
+        drop.classList.add('has-file');
+        drop.innerHTML = `
+          <img class="upi-preview" src="${e.target.result}" alt="Selected payment screenshot preview" style="max-width:200px;max-height:150px;border:1px solid var(--color-border);border-radius:var(--radius-md)">
+          <div class="upi-preview-name">${H.esc(file.name)}</div>
+          <div class="upi-drop-hint" style="margin-top:var(--space-1)">Click to choose a different file</div>`;
+        drop.appendChild(fileInput);
+        checkFormValidity();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    drop.addEventListener('click', () => fileInput.click());
+    drop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragging'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('dragging'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('dragging');
+      if (e.dataTransfer.files[0]) accept(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) accept(e.target.files[0]);
+    });
+
+    // Transaction ID validation
+    txnInput.addEventListener('input', (e) => {
+      // Allow only digits
+      e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+      validateTransactionId(e.target);
+      checkFormValidity();
+    });
+    txnInput.addEventListener('blur', () => validateTransactionId(txnInput));
+
+    // Amount input validation
+    amountInput.addEventListener('input', checkFormValidity);
+
+    // Initial check
+    checkFormValidity();
+  }
+
+  async function submitWalletRecharge() {
+    const amount = $('#recharge-amount').value.trim();
+    const transactionId = $('#recharge-txn-id').value.trim();
+    const screenshotBase64 = rechargeModalState.screenshotBase64;
+    const submitBtn = $('#recharge-submit-btn');
+
+    if (!amount || !transactionId || !screenshotBase64) {
+      Toast.error('Please fill all fields and upload a screenshot.');
+      return;
+    }
+
+    // Validate 12-digit transaction ID
+    if (!/^[0-9]{12}$/.test(transactionId)) {
+      Toast.error('Transaction ID must contain exactly 12 digits.');
+      $('#recharge-txn-id').focus();
+      validateTransactionId($('#recharge-txn-id'));
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `${I.refresh} Submitting...`;
+
+    try {
+      const res = await API.post('/payments/wallet/recharge', {
+        amount: Number(amount),
+        transaction_id: transactionId,
+        screenshot_base64: screenshotBase64
+      });
+      API.ensureOk(res);
+      Toast.success('Payment submitted successfully. Your wallet will be credited after admin verification.');
+      Modal.close('success-modal');
+      loadPayments();
+    } catch (e) {
+      const info = API.handleError({ status: e && e.status, data: e && e.data });
+      Toast.error(info.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `${I.check} Submit for Verification`;
+    }
+  }
+
+  function openRechargeDetailModal(rechargeId) {
+    Modal.closeAll();
+    const box = $('#success-modal-body');
+    box.innerHTML = `
+      <div class="modal-head-simple">
+        <h3>Recharge Request Details</h3>
+        <p class="text-muted">View the details of your wallet recharge request.</p>
+      </div>
+      <div class="loading-state"><span class="loading" aria-label="Loading"></span></div>`;
+    Modal.open('success-modal');
+
+    API.get(`/payments/wallet/recharge/history`)
+      .then(res => API.ensureOk(res))
+      .then(data => {
+        const recharges = data.recharges || [];
+        const r = recharges.find(x => String(x.id) === String(rechargeId));
+        if (!r) {
+          box.innerHTML = '<div class="empty-state"><p>Recharge request not found.</p></div>';
+          return;
+        }
+        renderRechargeDetail(r, box);
+      })
+      .catch(() => {
+        box.innerHTML = '<div class="empty-state"><p>Could not load recharge details.</p></div>';
+      });
+  }
+
+  function renderRechargeDetail(r, box) {
+    const statusColors = {
+      'pending_verification': 'var(--color-warning)',
+      'approved': 'var(--color-success)',
+      'rejected': 'var(--color-danger)'
+    };
+    box.innerHTML = `
+      <div class="card">
+        <div class="card-body">
+          <div class="summary-item"><span class="label">Request ID</span><span class="value confirm-code">${H.esc(r.recharge_id)}</span></div>
+          <div class="summary-item"><span class="label">Amount</span><span class="value" style="font-weight:700">${H.inr(r.amount)}</span></div>
+          <div class="summary-item"><span class="label">Transaction ID</span><span class="value" style="font-family:var(--font-mono)">${H.esc(r.transaction_id)}</span></div>
+          <div class="summary-item"><span class="label">Status</span><span class="value" style="color:${statusColors[r.status] || 'var(--color-text)'}"><strong>${H.esc(formatRechargeStatus(r.status))}</strong></span></div>
+          <div class="summary-item"><span class="label">Submitted</span><span class="value">${H.fmtDT(r.created_at)}</span></div>
+          ${r.verified_at ? `<div class="summary-item"><span class="label">${r.status === 'approved' ? 'Approved' : 'Rejected'} At</span><span class="value">${H.fmtDT(r.verified_at)}</span></div>` : ''}
+          ${r.admin_name ? `<div class="summary-item"><span class="label">Processed By</span><span class="value">${H.esc(r.admin_name)}</span></div>` : ''}
+          ${r.admin_notes ? `<div class="summary-item"><span class="label">Admin Notes</span><span class="value">${H.esc(r.admin_notes)}</span></div>` : ''}
+          ${r.rejected_reason ? `<div class="summary-item"><span class="label">Rejection Reason</span><span class="value" style="color:var(--color-danger)">${H.esc(r.rejected_reason)}</span></div>` : ''}
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 style="font-size:1.0625rem">Payment Screenshot</h3></div>
+          <div class="card-body" style="text-align:center">
+            ${r.screenshot_url ? `
+              <img alt="Payment screenshot" src="${r.screenshot_url}" style="max-width:100%;max-height:400px;border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:zoom-in" onclick="window.open(this.src,'_blank')">
+              <p class="text-muted small mt-1">Click to view full size</p>
+            ` : '<p class="text-muted">No screenshot available</p>'}
+          </div>
+        </div>
+      </div>`;
   }
 
   function renderProfile() {
@@ -1889,7 +2429,7 @@
   ============================================================ */
 async function loadAdmin() {
     const user = Auth.user;
-    if (!user || user.role !== 'admin') { navigate('dashboard'); return; }
+        if (!user || user.role !== 'admin') { navigate('home'); return; }
     adminTab('verifications');
     loadAdminStats();
     loadAdminVerifications();
@@ -1903,6 +2443,7 @@ async function loadAdmin() {
     $$('[data-admin-tab]').forEach(b => b.classList.toggle('active', b.dataset.adminTab === name));
     $$('[data-admin-panel]').forEach(p => p.classList.toggle('active', p.dataset.adminPanel === name));
     if (name === 'verifications') loadAdminVerifications();
+    if (name === 'wallet-recharges') loadAdminWalletRecharges();
     if (name === 'bookings') loadAdminBookings();
     if (name === 'users') loadAdminUsers();
     if (name === 'facilities') loadAdminFacilities();
@@ -1935,11 +2476,12 @@ async function loadAdmin() {
       lastQueueSignature = signature;
 
       if (!items.length) {
-        box.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${I.shield}</div><h3>Nothing to verify</h3><p>No payment screenshots are waiting for review.</p></div>`;
+        box.innerHTML = `<div class="verify-queue"><div class="empty-state"><div class="empty-state-icon">${I.shield}</div><h3>Nothing to verify</h3><p>No payment screenshots are waiting for review.</p></div></div>`;
         return;
       }
 
-      box.innerHTML = `<div class="alert alert-info">${I.alert} <strong>${items.length}</strong> payment${items.length > 1 ? 's' : ''} awaiting your decision. Check each screenshot against the amount due before approving.</div>` +
+      box.innerHTML = `<div class="verify-queue">` +
+        `<div class="alert alert-info verify-alert">${I.alert} <strong>${items.length}</strong> payment${items.length > 1 ? 's' : ''} awaiting your decision. Check each screenshot against the amount due before approving.</div>` +
         items.map(v => `
         <div class="verify-card">
           <div class="verify-card-head">
@@ -1957,7 +2499,7 @@ async function loadAdmin() {
           </div>
           <div class="verify-card-body">
             <div class="verify-meta">
-              <div><span class="label">Vehicle${(v.booking.vehicles || []).length > 1 ? 's' : ''}</span><span class="value">${(v.booking.vehicles || []).map(x => H.esc(x)).join(', ') || H.esc(v.booking.vehicle_no)}</span></div>
+              <div><span class="label">Vehicle No.</span><span class="value">${((v.booking.vehicles && v.booking.vehicles.length ? v.booking.vehicles[0] : v.booking.vehicle_no) || '').toUpperCase() || '<span class="text-muted">Not provided</span>'}</span></div>
               <div><span class="label">Slots</span><span class="value">${(v.booking.slot_codes || []).map(s => `<span class="badge badge-info">${H.esc(s)}</span>`).join(' ')}</span></div>
               <div><span class="label">Period</span><span class="value">${H.fmtDT(v.booking.start_time)} &rarr; ${H.fmtDT(v.booking.end_time)}</span></div>
               <div><span class="label">Transaction ID</span><span class="value" style="font-family:var(--font-mono);font-size:.8125rem">${H.esc(v.transaction_id) || '<span class="text-muted">Not provided</span>'}</span></div>
@@ -1969,10 +2511,10 @@ async function loadAdmin() {
                 : '<div class="text-muted" style="padding:var(--spacing-lg);text-align:center">No screenshot was attached.</div>'}
             </div>
           </div>
-          <div class="verify-card-foot">
-            <button class="btn btn-primary btn-sm" data-verify-open="${v.payment_id}">${I.shield} Review &amp; decide</button>
+<div class="verify-card-foot">
+            <button class="btn btn-primary btn-sm" data-verify-open="${v.payment_id}">${I.shield} Review & decide</button>
           </div>
-        </div>`).join('');
+        </div>`).join('') + `</div>`;
 
       releaseObjectUrls();
       mountProtectedImages(box);
@@ -1988,32 +2530,44 @@ async function loadAdmin() {
         });
       });
     } catch (e) {
-      box.innerHTML = '<div class="empty-state"><p>Could not load the verification queue.</p></div>';
+      box.innerHTML = '<div class="verify-queue"><div class="empty-state"><p>Could not load the verification queue.</p></div></div>';
     }
   }
 
-  async function loadAdminStats() {
-	    const box = $('#admin-stats');
-	    if (!box) return;
-	    box.innerHTML = '<div class="loading-state"><span class="loading" aria-label="Loading"></span></div>';
-	    try {
-	      const res = await API.get('/admin/dashboard');
-	      const d = API.ensureOk(res);
-	      const s = d.stats || {};
-	      box.innerHTML = `
-	        <div class="card stat-card"><div class="stat-icon">${I.users}</div><div><div class="stat-value">${s.total_users || 0}</div><div class="stat-label">Total users</div></div></div>
-	        <div class="card stat-card"><div class="stat-icon green">${I.pin}</div><div><div class="stat-value">${s.total_facilities || 0}</div><div class="stat-label">Active facilities</div></div></div>
-	        <div class="card stat-card"><div class="stat-icon amber">${I.calendar}</div><div><div class="stat-value">${s.total_bookings || 0}</div><div class="stat-label">Total bookings</div></div></div>
-        <div class="card stat-card"><div class="stat-icon red">${I.activity}</div><div><div class="stat-value">${s.today_revenue || 0}</div><div class="stat-label">Today&apos;s revenue</div></div></div>`;
-      const badge = $('[data-verify-count]');
-      if (badge) {
-        badge.textContent = s.pending_verifications || 0;
-        badge.classList.toggle('d-none', !s.pending_verifications);
+async function loadAdminStats() {
+    const box = $('#admin-stats');
+    if (!box) return;
+    box.innerHTML = '<div class="loading-state"><span class="loading" aria-label="Loading"></span></div>';
+    try {
+      const [dashRes, statsRes] = await Promise.all([
+        API.get('/admin/dashboard'),
+        API.get('/payments/admin/wallet/stats')
+      ]);
+      const d = API.ensureOk(dashRes);
+      const s = d.stats || {};
+      const walletStats = API.ensureOk(statsRes) || {};
+      
+      box.innerHTML = `
+        <div class="card stat-card"><div class="stat-icon">${I.users}</div><div><div class="stat-value">${s.total_users || 0}</div><div class="stat-label">Total users</div></div></div>
+        <div class="card stat-card"><div class="stat-icon green">${I.pin}</div><div><div class="stat-value">${s.total_facilities || 0}</div><div class="stat-label">Active facilities</div></div></div>
+        <div class="card stat-card"><div class="stat-icon amber">${I.calendar}</div><div><div class="stat-value">${s.total_bookings || 0}</div><div class="stat-label">Total bookings</div></div></div>
+        <div class="card stat-card"><div class="stat-icon red">${I.activity}</div><div><div class="stat-value">${H.inr(s.today_revenue || 0)}</div><div class="stat-label">Today's revenue</div></div></div>`;
+      
+      const verifyBadge = $('[data-verify-count]');
+      if (verifyBadge) {
+        verifyBadge.textContent = s.pending_verifications || 0;
+        verifyBadge.classList.toggle('d-none', !s.pending_verifications);
+      }
+      
+      const rechargeBadge = $('[data-recharge-count]');
+      if (rechargeBadge) {
+        rechargeBadge.textContent = walletStats.pending_count || 0;
+        rechargeBadge.classList.toggle('d-none', !walletStats.pending_count);
       }
     } catch (e) {
-	      box.innerHTML = '<div class="card stat-card"><div><div class="stat-label">Could not load stats.</div></div></div>';
-	    }
-	  }
+      box.innerHTML = '<div class="card stat-card"><div><div class="stat-label">Could not load stats.</div></div></div>';
+    }
+  }
 	
 async function loadAdminBookings() {
     const body = $('#admin-bookings-body');
@@ -2070,28 +2624,33 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
 
       const body = $('#success-modal-body');
       body.innerHTML = `
-        <div class="modal-head-simple">
-          <h3>${I.shield} Verify UPI payment</h3>
-          <p class="text-muted">Compare the screenshot against the amount due, then approve or reject.</p>
+        <div class="modal-head-simple verify-modal-head">
+          <div class="verify-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="verify-head-text">
+            <h3>Verify UPI Payment</h3>
+            <p class="text-muted">Compare the screenshot against the amount due, then approve or reject.</p>
+          </div>
         </div>
         <div class="verify-modal-grid">
-          <div class="card" style="padding:var(--spacing-md)">
+          <div class="card verify-details-card">
             <div class="summary-item"><span class="label">Booking</span><span class="value confirm-code">${H.esc(booking.booking_id)}</span></div>
-            <div class="summary-item"><span class="label">Amount due</span><span class="value" style="font-weight:700">${H.inr(item.amount)}</span></div>
-            <div class="summary-item"><span class="label">Paid via</span><span class="value">${H.esc(String(item.method || '').toUpperCase())}</span></div>
+            <div class="summary-item"><span class="label">Amount Due</span><span class="value" style="font-weight:700">${H.inr(item.amount)}</span></div>
+            <div class="summary-item"><span class="label">Paid Via</span><span class="value">${H.esc(String(item.method || '').toUpperCase())}</span></div>
             <div class="summary-item"><span class="label">User</span><span class="value">${H.esc(user ? user.full_name : 'Unknown')} <span class="text-muted">(${H.esc(user ? user.user_id : '')})</span></span></div>
             <div class="summary-item"><span class="label">Contact</span><span class="value" style="font-size:.8125rem">${H.esc(user ? user.email : '')}</span></div>
-            <div class="summary-item"><span class="label">Vehicle${(booking.vehicles || []).length > 1 ? 's' : ''}</span><span class="value">${(booking.vehicles || []).map(x => H.esc(x)).join(', ') || H.esc(booking.vehicle_no)}</span></div>
+            <div class="summary-item"><span class="label">Vehicle No.</span><span class="value" style="text-transform:uppercase;font-family:var(--font-mono)">${H.esc((booking.vehicles && booking.vehicles.length ? booking.vehicles[0] : booking.vehicle_no) || 'Not provided')}</span></div>
             <div class="summary-item"><span class="label">Slots</span><span class="value">${(booking.slot_codes || []).map(s => `<span class="badge badge-info">${H.esc(s)}</span>`).join(' ')}</span></div>
             <div class="summary-item"><span class="label">Period</span><span class="value" style="font-size:.8125rem">${H.fmtDT(booking.start_time)} &rarr; ${H.fmtDT(booking.end_time)}</span></div>
             <div class="summary-item"><span class="label">Transaction ID</span><span class="value" style="font-family:var(--font-mono);font-size:.8125rem">${H.esc(item.transaction_id) || 'Not provided'}</span></div>
             <div class="summary-item"><span class="label">Uploaded</span><span class="value">${H.fmtDT(item.uploaded_at)}</span></div>
           </div>
-          <div class="card" style="padding:var(--spacing-md);text-align:center">
+          <div class="card verify-screenshot-card">
             <label class="form-label" style="display:block;text-align:left">Payment Screenshot</label>
             ${item.screenshot_url ? `
-              <img alt="Payment screenshot" style="max-width:100%;max-height:420px;border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:zoom-in" data-verify-shot data-shot-src="${H.esc(item.screenshot_url)}">
-              <p class="text-muted small mt-1">Click the image to open it full size</p>
+              <img alt="Payment screenshot" class="verify-screenshot-img" data-verify-shot data-shot-src="${H.esc(item.screenshot_url)}">
+              <p class="text-muted small mt-1">Click to view full size</p>
             ` : '<p class="text-muted">No screenshot available</p>'}
           </div>
         </div>
@@ -2099,9 +2658,9 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
           <label class="form-label" for="admin-verify-notes">Notes (required when rejecting)</label>
           <textarea id="admin-verify-notes" class="form-input" rows="3" placeholder="e.g. Amount on screenshot does not match, or Verified against bank statement."></textarea>
         </div>
-        <div style="display:flex;gap:var(--spacing-sm)">
-          <button class="btn btn-danger btn-flex-1" id="btn-reject">${I.x} Reject payment</button>
-          <button class="btn btn-success btn-flex-1" id="btn-approve">${I.check} Approve payment</button>
+        <div class="verify-actions">
+          <button class="btn btn-danger" id="btn-reject">${I.x} Reject</button>
+          <button class="btn btn-success" id="btn-approve">${I.check} Approve</button>
         </div>`;
 
       Modal.closeAll();
@@ -2214,34 +2773,122 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
 	    }
 	  }
 	
-	  async function loadAdminRevenue() {
-	    const box = $('#revenue-breakdown');
-	    const top = $('#top-facilities');
-	    if (!box) return;
-	    try {
-	      const res = await API.get('/admin/revenue?days=30');
-	      const d = API.ensureOk(res);
-	      const total = (d.daily || []).reduce((a, x) => a + (x.revenue || 0), 0);
-	      const bv = d.by_vehicle || [];
-	      box.innerHTML = `
-	        <div class="card stat-card"><div class="stat-icon green">${I.activity}</div><div><div class="stat-value">${H.inr(total)}</div><div class="stat-label">30-day revenue</div></div></div>
-	        <div class="card"><div class="card-body"><h4 class="mb-2" style="font-size:.9375rem">By vehicle type</h4>${bv.map(v => `
-	          <div class="mb-2"><div class="flex-between mb-1"><span style="font-size:.8125rem">${H.esc(v.vehicle_type)}</span><span style="font-size:.8125rem">${H.inr(v.revenue)}</span></div>
-	          <div class="progress-track"><div class="progress-fill" style="width:${total ? Math.round(v.revenue / total * 100) : 0}%"></div></div></div>`).join('') || '<p class="text-muted">No data</p>'}</div></div>
-	        <div class="card"><div class="card-body"><h4 class="mb-2" style="font-size:.9375rem">Bookings / day</h4>${(d.daily || []).slice(-7).map(x => `
-	          <div class="mb-2"><div class="flex-between mb-1"><span style="font-size:.8125rem">${H.esc(x.date)}</span><span style="font-size:.8125rem">${x.bookings} bkgs</span></div>
-	          <div class="progress-track"><div class="progress-fill green" style="width:${x.bookings * 10}%"></div></div></div>`).join('') || '<p class="text-muted">No data</p>'}</div></div>`;
-	      top.innerHTML = `<div class="table-responsive"><table class="data-table">
-	        <thead><tr><th>Facility</th><th>Revenue</th><th>Bookings</th></tr></thead>
-	        <tbody>` + (d.top_facilities || []).map(f => `
-	          <tr><td>${H.esc(f.name)}</td><td>${H.inr(f.revenue)}</td><td>${f.bookings}</td></tr>`).join('') +
-	        `</tbody></table></div>`;
-	    } catch (e) {
-	      box.innerHTML = '<div class="card"><div class="card-body"><p class="text-muted">Revenue data unavailable.</p></div></div>';
-	    }
-	  }
-	
-	  function openFacilityModal() {
+async function loadAdminRevenue() {
+    const box = $('#revenue-breakdown');
+    const top = $('#top-facilities');
+    if (!box) return;
+    try {
+      const res = await API.get('/admin/revenue?days=30');
+      const d = API.ensureOk(res);
+      const total = (d.daily || []).reduce((a, x) => a + (x.revenue || 0), 0);
+      const bv = d.by_vehicle || [];
+      box.innerHTML = `
+        <div class="card stat-card"><div class="stat-icon green">${I.activity}</div><div><div class="stat-value">${H.inr(total)}</div><div class="stat-label">30-day revenue</div></div></div>
+        <div class="card"><div class="card-body"><h4 class="mb-2" style="font-size:.9375rem">By vehicle type</h4>${bv.map(v => `
+          <div class="mb-2"><div class="flex-between mb-1"><span style="font-size:.8125rem">${H.esc(v.vehicle_type)}</span><span style="font-size:.8125rem">${H.inr(v.revenue)}</span></div>
+          <div class="progress_track"><div class="progress-fill" style="width:${total ? Math.round(v.revenue / total * 100) : 0}%"></div></div></div>`).join('') || '<p class="text-muted">No data</p>'}</div></div>
+        <div class="card"><div class="card-body"><h4 class="mb-2" style="font-size:.9375rem">Bookings / day</h4>${(d.daily || []).slice(-7).map(x => `
+          <div class="mb-2"><div class="flex-between mb-1"><span style="font-size:.8125rem">${H.esc(x.date)}</span><span style="font-size:.8125rem">${x.bookings} bkgs</span></div>
+          <div class="progress_track"><div class="progress-fill green" style="width:${x.bookings * 10}%"></div></div></div>`).join('') || '<p class="text-muted">No data</p>'}</div></div>`;
+      top.innerHTML = `<div class="table-responsive"><table class="data-table">
+        <thead><tr><th>Facility</th><th>Revenue</th><th>Bookings</th></tr></thead>
+        <tbody>` + (d.top_facilities || []).map(f => `
+          <tr><td>${H.esc(f.name)}</td><td>${H.inr(f.revenue)}</td><td>${f.bookings}</td></tr>`).join('') +
+        `</tbody></table></div>`;
+    } catch (e) {
+      box.innerHTML = '<div class="card"><div class="card-body"><p class="text-muted">Revenue data unavailable.</p></div></div>';
+    }
+  }
+
+  async function loadAdminWalletRecharges() {
+    const body = $('#admin-recharges-body');
+    const footer = $('#admin-recharges-footer');
+    if (!body) return;
+    const statusFilter = $('#admin-recharge-status').value;
+    body.innerHTML = `<tr><td colspan="6"><div class="loading-state"><span class="loading" aria-label="Loading"></span></div></td></tr>`;
+    try {
+      const params = new URLSearchParams({ per_page: 50 });
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await API.get('/payments/admin/wallet/recharges?' + params);
+      const data = API.ensureOk(res);
+      const list = data.recharges || [];
+      const pagination = data.pagination || {};
+      
+      if (!list.length) {
+        body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><p>No wallet recharge requests.</p></div></td></tr>`;
+        if (footer) footer.innerHTML = '';
+        return;
+      }
+
+      body.innerHTML = list.map(r => {
+        const statusBadge = walletRechargeBadge(r.status);
+        const statusText = formatRechargeStatus(r.status);
+        const approveBtn = r.status === 'pending_verification'
+          ? `<button class="btn btn-sm btn-success" data-recharge-approve="${r.id}">${I.check} Approve</button>`
+          : '';
+        const rejectBtn = r.status === 'pending_verification'
+          ? `<button class="btn btn-sm btn-danger" data-recharge-reject="${r.id}">${I.x} Reject</button>`
+          : '';
+        const viewBtn = r.screenshot_url
+          ? `<button class="btn btn-sm btn-outline" data-shot-open="${r.screenshot_file}" data-shot-src="${r.screenshot_url}">${I.eye} View</button>`
+          : '';
+        return `
+        <tr>
+          <td><strong>${H.esc(r.recharge_id)}</strong><br><span class="text-muted" style="font-size:.8125rem">${H.esc(r.user_name || '')} &middot; ${H.esc(r.user_email || '')}</span></td>
+          <td>${H.inr(r.amount)}</td>
+          <td><code style="font-size:.8125rem">${H.esc(r.transaction_id)}</code></td>
+          <td><span class="badge ${statusBadge}">${H.esc(statusText)}</span></td>
+          <td>${H.fmtDT(r.created_at)}</td>
+          <td style="white-space:nowrap">${viewBtn} ${approveBtn} ${rejectBtn}</td>
+        </tr>`;
+      }).join('');
+
+      $$('[data-recharge-approve]', body).forEach(b => b.addEventListener('click', () => adminApproveRecharge(b.dataset.rechargeApprove)));
+      $$('[data-recharge-reject]', body).forEach(b => b.addEventListener('click', () => adminRejectRecharge(b.dataset.rechargeReject)));
+      $$('[data-shot-open]', body).forEach(b => {
+        b.addEventListener('click', async () => {
+          const src = b.dataset.shotSrc;
+          if (src) window.open(src, '_blank');
+        });
+      });
+
+      if (footer) {
+        footer.innerHTML = `<span class="pagination-page">${list.length} requests shown (page ${pagination.page || 1} of ${pagination.pages || 1})</span>`;
+      }
+    } catch (e) {
+      body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><p>Could not load wallet recharge requests.</p></div></td></tr>`;
+    }
+  }
+
+  async function adminApproveRecharge(rechargeId) {
+    console.log('adminApproveRecharge called', rechargeId);
+    try {
+      const res = await API.post(`/payments/admin/wallet/recharge/${rechargeId}`, { action: 'approve' });
+      API.ensureOk(res);
+      Toast.success('Wallet recharge approved and amount credited.');
+      loadAdminWalletRecharges();
+      loadAdminStats();
+    } catch (e) {
+      const info = API.handleError({ status: e && e.status, data: e && e.data });
+      Toast.error(info.message);
+    }
+  }
+
+  async function adminRejectRecharge(rechargeId) {
+    const notes = prompt('Enter rejection reason (required):');
+    if (!notes) return;
+    try {
+      const res = await API.post(`/payments/admin/wallet/recharge/${rechargeId}`, { action: 'reject', notes });
+      API.ensureOk(res);
+      Toast.success('Wallet recharge rejected.');
+      loadAdminWalletRecharges();
+    } catch (e) {
+      const info = API.handleError({ status: e && e.status, data: e && e.data });
+      Toast.error(info.message);
+    }
+  }
+
+  function openFacilityModal() {
 	    ['fac-name', 'fac-street', 'fac-area', 'fac-city-in', 'fac-pincode', 'fac-lat', 'fac-lng'].forEach(id => {
 	      const el = document.getElementById(id);
 	      if (el) el.value = '';
@@ -2283,28 +2930,39 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
 	    btn.disabled = false;
 	  }
 
-  /* ============================================================
+/* ============================================================
      AUTH FORMS
-  ============================================================ */
+   ============================================================ */
   function bindAuth() {
-    $('#login-form').addEventListener('submit', async (e) => {
+    const loginForm = $('#login-form');
+    if (!loginForm) return;
+    
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = $('#login-email').value.trim();
-      const pass = $('#login-password').value;
+      const emailEl = $('#login-email');
+      const passEl = $('#login-password');
+      if (!emailEl || !passEl) { Toast.error('Form elements not found'); return; }
+      
+      const email = emailEl.value.trim();
+      const pass = passEl.value;
       if (!email || !pass) { Toast.error('Please enter your email and password.'); return; }
-      const btn = $('button[type=submit]', e.target);
-      btn.disabled = true; btn.textContent = 'Signing in...';
+      
+      const btn = $('button[type=submit]', loginForm);
+      if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+      
       try {
         const res = await API.post('/auth/login', { email, password: pass });
         const data = API.ensureOk(res);
         Auth.saveSession(data);
-        Toast.success('Welcome back, ' + (data.user.full_name || '') + '!');
-        navigate(data.user.role === 'admin' ? 'admin' : 'home');
+        Toast.success('Welcome back, ' + (data.user?.full_name || '') + '!');
+        navigate(data.user?.role === 'admin' ? 'admin' : 'home');
       } catch (err) {
         const info = API.handleError({ status: err && err.status, data: err && err.data });
         Toast.error(info.message);
+        console.error('Login error:', err);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
       }
-      btn.disabled = false; btn.textContent = 'Sign In';
     });
 
     $('#register-form').addEventListener('submit', async (e) => {
@@ -2314,7 +2972,7 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
         email: $('#reg-email').value.trim(),
         phone: $('#reg-phone').value.trim(),
         password: $('#reg-password').value,
-        vehicle_no: $('#reg-vehicle').value.trim().toUpperCase() || undefined
+        vehicle_no: $('#reg-vehicle').value.trim().toUpperCase().replace(/\s+/g, '') || undefined
       };
       if (!f.full_name || !f.email || !f.phone || !f.password) { Toast.error('Please fill all required fields.'); return; }
       const btn = $('button[type=submit]', e.target);
@@ -2327,13 +2985,21 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
           try { await API.post('/users/vehicles', { vehicle_no: f.vehicle_no, vehicle_type: 'Car', is_default: true }); } catch (x) { /* optional */ }
         }
         Toast.success('Account created! Welcome to ParkEase.');
-        navigate('dashboard');
+        navigate('home');
       } catch (err) {
         const info = API.handleError({ status: err && err.status, data: err && err.data });
         Toast.error(info.message);
       }
       btn.disabled = false; btn.textContent = 'Create Account';
     });
+
+    // Auto-format vehicle number in registration form
+    const regVehicle = $('#reg-vehicle');
+    if (regVehicle) {
+      regVehicle.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase().replace(/\s+/g, '');
+      });
+    }
   }
 
   /* ============================================================
@@ -2344,7 +3010,10 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
     $$('[data-view-link]').forEach(el => {
       el.addEventListener('click', (e) => {
         if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault();
-        navigate(el.dataset.viewLink);
+        const link = el.dataset.viewLink;
+        // Auto-navigate admin users to admin dashboard when clicking dashboard link
+        const target = (link === 'dashboard' && Auth.user && Auth.user.role === 'admin') ? 'admin' : link;
+        navigate(target);
       });
     });
 
@@ -2394,9 +3063,16 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
     if (vt) vt.addEventListener('change', () => { state.selectedSlots = []; renderSlotGrid(); });
     const sc = $('#booking-slot-count');
     if (sc) sc.addEventListener('change', () => { state.selectedSlots = state.selectedSlots.slice(0, Number(sc.value)); renderSlotGrid(); });
-    ['booking-date', 'booking-start', 'booking-end'].forEach(id => {
+    ['booking-date', 'booking-end-date', 'booking-start', 'booking-end'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', () => { if (state.facility) { state.selectedSlots = []; renderSlotGrid(); } });
+    });
+    
+    // Monthly pass option radio buttons
+    $$('[name="monthly-pass"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (state.facility) estimate();
+      });
     });
 
     // Booking CTA
@@ -2418,6 +3094,12 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
     $$('[data-admin-tab]').forEach(b => b.addEventListener('click', () => adminTab(b.dataset.adminTab)));
     const avr = $('[data-verify-refresh]');
     if (avr) avr.addEventListener('click', () => { loadAdminVerifications(); loadAdminStats(); });
+
+    // Admin wallet recharges
+    const ars = $('#admin-recharge-status');
+    if (ars) ars.addEventListener('change', loadAdminWalletRecharges);
+    const arr = $('[data-recharge-refresh]');
+    if (arr) arr.addEventListener('click', loadAdminWalletRecharges);
 
     // Socket pushes only arrive while the socket is connected, so an admin tab
     // left open could sit on a stale queue and never show a fresh upload.
@@ -2513,14 +3195,33 @@ footer.innerHTML = `<span class="pagination-page">${list.length} bookings shown<
     window.AuthChanged(Auth.user);
   }
 
-  /* ============================================================
+/* ============================================================
      BOOT
-  ============================================================ */
-  function boot() {
+   ============================================================ */
+  async function boot() {
     bindGlobal();
     bindAuth();
     refreshNavbar();
-    navigate(Auth.isLoggedIn() ? 'home' : 'home');
+    
+    // If we have a local session, verify it with the server
+    if (Auth.isLoggedIn()) {
+      try {
+        const res = await API.get('/auth/verify');
+        if (res.ok) {
+          Auth.saveSession(res.data);
+          refreshNavbar();
+        } else {
+          Auth.logout();
+        }
+      } catch (e) {
+        Auth.logout();
+      }
+    }
+    
+    const initialView = Auth.isLoggedIn() 
+      ? (Auth.user?.role === 'admin' ? 'admin' : 'home')
+      : 'home';
+    navigate(initialView);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

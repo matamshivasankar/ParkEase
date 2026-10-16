@@ -1,86 +1,119 @@
 /* ============================================================
-   ParkEase Design Tokens - Single Source of Truth
+   ParkEase Design Tokens - Natural & Professional
    ============================================================ */
 
 :root {
-  /* ---------- Color: Brand ---------- */
-  --color-brand: #0f4c8c;
-  --color-brand-hover: #0d3f73;
-  --color-brand-active: #09335a;
-  --color-brand-light: rgba(15, 76, 140, 0.08);
-  --color-brand-lighter: rgba(15, 76, 140, 0.04);
+  /* ---------- Color: Brand (Primary Navy) ---------- */
+  --color-brand: #243F78;
+  --color-brand-dark: #1B3160;
+  --color-brand-hover: #1E3566;
+  --color-brand-active: #182B52;
+  --color-brand-light: rgba(36, 63, 120, 0.08);
+  --color-brand-lighter: rgba(36, 63, 120, 0.04);
 
-  --color-brand-accent: #00a86b;
-  --color-brand-accent-hover: #008f5a;
-  --color-brand-accent-light: rgba(0, 168, 107, 0.1);
+  /* ---------- Color: Brand Accent (same navy - single primary color) ---------- */
+  --color-brand-accent: #243F78;
+  --color-brand-accent-hover: #1E3566;
+  --color-brand-accent-light: rgba(36, 63, 120, 0.08);
+  --color-brand-accent-lighter: rgba(36, 63, 120, 0.04);
 
-  --color-brand-warn: #f08c00;
-  --color-brand-warn-hover: #d47a00;
-  --color-brand-warn-light: rgba(240, 140, 0, 0.1);
+  /* ---------- Color: Brand Warn (restrained amber for pending status) ---------- */
+  --color-brand-warn: #B45309;
+  --color-brand-warn-hover: #92400E;
+  --color-brand-warn-light: rgba(180, 83, 9, 0.1);
 
-  --color-brand-danger: #d93025;
-  --color-brand-danger-hover: #c12a20;
-  --color-brand-danger-light: rgba(217, 48, 37, 0.1);
+  /* ---------- Color: Primary (Navy - links, active nav) ---------- */
+  --color-primary: #243F78;
+  --color-primary-hover: #1E3566;
+  --color-primary-active: #182B52;
+  --color-primary-light: rgba(36, 63, 120, 0.08);
+  --color-primary-lighter: rgba(36, 63, 120, 0.04);
 
-  /* ---------- Color: Neutral (Gray Scale) ---------- */
-  --color-neutral-0: #ffffff;
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
-  --color-neutral-950: #020617;
+  /* ---------- Color: Success (Green - meaningful status only) ---------- */
+  --color-success: #16A34A;
+  --color-success-hover: #15803D;
+  --color-success-light: rgba(22, 163, 74, 0.1);
+
+  /* ---------- Color: Warning (Amber - meaningful status only) ---------- */
+  --color-warning: #B45309;
+  --color-warning-hover: #92400E;
+  --color-warning-light: rgba(180, 83, 9, 0.1);
+
+  /* ---------- Color: Danger / Error ---------- */
+  --color-danger: #DC2626;
+  --color-danger-hover: #B91C1C;
+  --color-danger-light: rgba(220, 38, 38, 0.1);
+
+  /* ---------- Color: Neutral Scale ---------- */
+  --color-white: #FFFFFF;
+  --color-gray-50: #F5F7FA;
+  --color-gray-100: #EEF1F5;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
 
   /* ---------- Color: Semantic Aliases ---------- */
-  --color-bg: var(--color-neutral-50);
-  --color-bg-elevated: var(--color-neutral-0);
-  --color-bg-hover: var(--color-neutral-100);
-  --color-bg-active: var(--color-neutral-200);
-  --color-bg-disabled: var(--color-neutral-100);
+  --color-bg: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-section: #F5F7FA;
+  --color-bg-hover: #F5F7FA;
+  --color-bg-active: #EEF1F5;
+  --color-bg-disabled: #F5F7FA;
 
-  --color-border: var(--color-neutral-200);
-  --color-border-strong: var(--color-neutral-300);
-  --color-border-focus: var(--color-brand);
-  --color-border-error: var(--color-brand-danger);
+  --color-border: #D1D5DB;
+  --color-border-light: #E5E7EB;
+  --color-border-strong: #9CA3AF;
+  --color-border-focus: #243F78;
+  --color-border-error: #DC2626;
 
-  --color-text: var(--color-neutral-900);
-  --color-text-secondary: var(--color-neutral-600);
-  --color-text-muted: var(--color-neutral-400);
-  --color-text-inverse: var(--color-neutral-0);
-  --color-text-disabled: var(--color-neutral-400);
-  --color-text-link: var(--color-brand);
+  --color-text: #374151;
+  --color-text-primary: #374151;
+  --color-heading-primary: #374151;
+  --color-body-text: #374151;
+  --color-text-blue: #243F78;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-text-inverse: #FFFFFF;
+  --color-text-disabled: #9CA3AF;
+  --color-text-link: #243F78;
 
-  --color-success: var(--color-brand-accent);
-  --color-warning: var(--color-brand-warn);
-  --color-danger: var(--color-brand-danger);
-  --color-info: var(--color-brand);
+  --color-info: #243F78;
+  --color-neutral-50: #F5F7FA;
+  --color-neutral-100: #EEF1F5;
+  --color-neutral-200: #E5E7EB;
+  --color-neutral-300: #D1D5DB;
+  --color-neutral-400: #9CA3AF;
+  --color-neutral-500: #6B7280;
+  --color-neutral-600: #4B5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1F2937;
+  --color-neutral-900: #111827;
 
-  /* ---------- Color: Status Backgrounds ---------- */
-  --color-status-success-bg: var(--color-brand-accent-light);
-  --color-status-success-text: var(--color-brand-accent-hover);
-  --color-status-warning-bg: var(--color-brand-warn-light);
-  --color-status-warning-text: var(--color-brand-warn-hover);
-  --color-status-danger-bg: var(--color-brand-danger-light);
-  --color-status-danger-text: var(--color-brand-danger-hover);
-  --color-status-info-bg: var(--color-brand-light);
-  --color-status-info-text: var(--color-brand-hover);
-  --color-status-neutral-bg: var(--color-neutral-100);
-  --color-status-neutral-text: var(--color-neutral-600);
+  --color-status-success-bg: var(--color-success-light);
+  --color-status-success-text: var(--color-success-hover);
+  --color-status-warning-bg: var(--color-warning-light);
+  --color-status-warning-text: var(--color-warning-hover);
+  --color-status-danger-bg: var(--color-danger-light);
+  --color-status-danger-text: var(--color-danger-hover);
+  --color-status-info-bg: var(--color-primary-light);
+  --color-status-info-text: var(--color-primary-hover);
+  --color-status-neutral-bg: var(--color-gray-100);
+  --color-status-neutral-text: var(--color-gray-500);
 
   /* ---------- Color: Overlay ---------- */
-  --color-overlay: rgba(15, 23, 42, 0.5);
-  --color-overlay-strong: rgba(15, 23, 42, 0.7);
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-overlay-strong: rgba(0, 0, 0, 0.6);
 
   /* ---------- Typography ---------- */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 
-  /* Type Scale (fluid via clamp) */
+  /* Type Scale */
   --text-xs: 0.75rem;     /* 12px */
   --text-sm: 0.875rem;    /* 14px */
   --text-base: 1rem;      /* 16px */
@@ -88,18 +121,18 @@
   --text-xl: 1.25rem;     /* 20px */
   --text-2xl: 1.5rem;     /* 24px */
   --text-3xl: 1.875rem;   /* 30px */
-  --text-4xl: clamp(2rem, 1.5rem + 2vw, 2.5rem);  /* 32-40px */
-  --text-5xl: clamp(2.5rem, 1.75rem + 3vw, 3.5rem); /* 40-56px */
+  --text-4xl: 2.25rem;    /* 36px */
+  --text-5xl: 3rem;       /* 48px */
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --line-height-tight: 1.15;
+  --line-height-tight: 1.2;
   --line-height-snug: 1.35;
-  --line-height-normal: 1.6;
-  --line-height-relaxed: 1.75;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
 
   /* ---------- Spacing Scale (4px base) ---------- */
   --space-0: 0;
@@ -118,23 +151,23 @@
   /* ---------- Border Radius ---------- */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
   --radius-full: 9999px;
 
-  /* ---------- Shadows ---------- */
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.1), 0 4px 8px rgba(15, 23, 42, 0.05);
-  --shadow-xl: 0 20px 40px rgba(15, 23, 42, 0.12), 0 8px 16px rgba(15, 23, 42, 0.06);
+  /* ---------- Shadows (Subtle only) ---------- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.07), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.05);
 
-  --shadow-focus: 0 0 0 3px rgba(15, 76, 140, 0.25);
-  --shadow-focus-error: 0 0 0 3px rgba(217, 48, 37, 0.25);
+  --shadow-focus: 0 0 0 3px rgba(10, 31, 68, 0.2);
+  --shadow-focus-error: 0 0 0 3px rgba(192, 57, 43, 0.2);
 
   /* ---------- Transitions ---------- */
-  --duration-fast: 120ms;
+  --duration-fast: 150ms;
   --duration-normal: 200ms;
   --duration-slow: 300ms;
   --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -150,9 +183,11 @@
   --z-tooltip: 700;
 
   /* ---------- Layout ---------- */
-  --container-max: 1280px;
-  --container-padding: var(--space-6);
-  --header-height: 72px;
+  --container-max: 1200px;
+  --container-padding-mobile: 16px;
+  --container-padding-tablet: 24px;
+  --container-padding-desktop: 32px;
+  --header-height: 64px;
 
   /* ---------- Breakpoints ---------- */
   --bp-sm: 640px;
